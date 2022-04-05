@@ -5,16 +5,21 @@ os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 # noinspection PyPackageRequirements
 import pygame
 
-from abc import ABC, abstractmethod
 from typing import List, Optional, Tuple
 
+from .drone_controller import DroneController
 
-class DroneController(ABC):
-    """A flight controller for a drone."""
 
-    # PUBLIC ABSTRACT METHODS
+class FlyToPointDroneController(DroneController):
+    """TODO"""
 
-    @abstractmethod
+    # CONSTRUCTOR
+
+    def __init__(self):
+        pass
+
+    # PUBLIC METHODS
+
     def iterate(self, *, altitude: Optional[float] = None, events: Optional[List[pygame.event.Event]] = None,
                 image: np.ndarray, image_timestamp: Optional[float] = None,
                 intrinsics: Tuple[float, float, float, float], tracker_c_t_i: Optional[np.ndarray] = None) -> None:
@@ -32,14 +37,3 @@ class DroneController(ABC):
                                     one, the transformation will be non-metric.
         """
         pass
-
-    # PUBLIC METHODS
-
-    # noinspection PyMethodMayBeStatic
-    def should_quit(self) -> bool:
-        """
-        Get whether or not the controller currently wants the program to quit.
-
-        :return:    True, if the controller wants the program to quit, or False otherwise.
-        """
-        return False
