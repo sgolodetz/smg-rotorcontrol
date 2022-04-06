@@ -4,19 +4,40 @@ import os
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 # noinspection PyPackageRequirements
 import pygame
+import threading
 
 from typing import List, Optional, Tuple
+
+from smg.navigation import AStarPathPlanner, OCS_OCCUPIED, Path, PlanningToolkit
+from smg.pyoctomap import OcTree
+from smg.rotory.drones import Drone
 
 from .drone_controller import DroneController
 
 
-class FlyToPointDroneController(DroneController):
+class FollowWaypointsDroneController(DroneController):
     """TODO"""
 
     # CONSTRUCTOR
 
-    def __init__(self):
-        pass
+    def __init__(self, *, drone: Drone, planning_octree: OcTree):
+        self.__drone: Drone = drone
+        self.__planning_octree: OcTree = planning_octree
+
+        # The path planning variables, together with their lock.
+        self.__path: Optional[Path] = None
+        self.__planning_lock: threading.Lock = threading.Lock()
+        self.__waypoints: Optional[List[np.ndarray]] = None
+
+        # Construct the planning toolkit.
+        self.__planning_toolkit = PlanningToolkit(
+            self.__planning_octree,
+            neighbours=PlanningToolkit.neighbours6,
+            node_is_free=lambda n: self.__planning_toolkit.occupancy_status(n) != OCS_OCCUPIED
+        )
+
+        # Construct the path planner.
+        self.__planner: AStarPathPlanner = AStarPathPlanner(self.__planning_toolkit, debug=False)
 
     # PUBLIC METHODS
 
@@ -36,4 +57,18 @@ class FlyToPointDroneController(DroneController):
                                     by any tracker that's running (optional). Note that if the tracker is a monocular
                                     one, the transformation will be non-metric.
         """
+        pass
+
+    def set_waypoints(self, waypoints: List[np.ndarray]) -> None:
+        """
+        TODO
+
+        :param waypoints:   TODO
+        """
+        with self.__planning_lock:
+            self.__waypoints = waypoints
+
+    # PRIVATE METHODS
+
+    def __run_planning(self) -> None:
         pass
