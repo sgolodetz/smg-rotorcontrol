@@ -5,6 +5,7 @@ os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 # noinspection PyPackageRequirements
 import pygame
 import threading
+import time
 
 from typing import List, Optional, Tuple
 
@@ -21,8 +22,11 @@ class FollowWaypointsDroneController(DroneController):
     # CONSTRUCTOR
 
     def __init__(self, *, drone: Drone, planning_octree: OcTree):
+        self.__alive: bool = False
+
         self.__drone: Drone = drone
         self.__planning_octree: OcTree = planning_octree
+        self.__should_terminate: threading.Event = threading.Event()
 
         # The path planning variables, together with their lock.
         self.__path: Optional[Path] = None
@@ -38,6 +42,12 @@ class FollowWaypointsDroneController(DroneController):
 
         # Construct the path planner.
         self.__planner: AStarPathPlanner = AStarPathPlanner(self.__planning_toolkit, debug=False)
+
+        # Start the path planning thread.
+        self.__planning_thread: threading.Thread = threading.Thread(target=self.__run_planning)
+        self.__planning_thread.start()
+
+        self.__alive = True
 
     # PUBLIC METHODS
 
@@ -68,7 +78,22 @@ class FollowWaypointsDroneController(DroneController):
         with self.__planning_lock:
             self.__waypoints = waypoints
 
+    def terminate(self) -> None:
+        """Destroy the controller."""
+        if self.__alive:
+            # Set the termination flag if it isn't set already.
+            if not self.__should_terminate.is_set():
+                self.__should_terminate.set()
+
+            # Join any running threads.
+            # TODO
+
+            self.__alive = False
+
     # PRIVATE METHODS
 
     def __run_planning(self) -> None:
-        pass
+        # Until the simulator should terminate:
+        while not self.__should_terminate.is_set():
+            # Wait for 10ms before performing any further path planning, so as to avoid a spin loop.
+            time.sleep(0.01)
