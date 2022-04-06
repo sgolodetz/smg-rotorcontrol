@@ -67,7 +67,31 @@ class FollowWaypointsDroneController(DroneController):
                                     by any tracker that's running (optional). Note that if the tracker is a monocular
                                     one, the transformation will be non-metric.
         """
-        pass
+        path: Optional[Path] = None
+
+        # If we're able to acquire the planning lock:
+        acquired: bool = self.__planning_lock.acquire(blocking=False)
+        if acquired:
+            try:
+                # Provide the path planner with the current position of the drone, and tell it that some
+                # path planning is needed.
+                # TODO
+                pass
+
+                # Capture any existing path that has been planned locally so that we can use it without
+                # having to hold on to the lock.
+                # TODO: Implement Path.copy().
+                # path = self.__path.copy()
+            finally:
+                self.__planning_lock.release()
+
+        # Otherwise, early out.
+        else:
+            return
+
+        # TODO
+        if path is not None:
+            pass
 
     def set_waypoints(self, waypoints: List[np.ndarray]) -> None:
         """
@@ -86,7 +110,7 @@ class FollowWaypointsDroneController(DroneController):
                 self.__should_terminate.set()
 
             # Join any running threads.
-            # TODO
+            self.__planning_thread.join()
 
             self.__alive = False
 
