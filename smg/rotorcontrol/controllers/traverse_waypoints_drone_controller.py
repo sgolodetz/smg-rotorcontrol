@@ -149,20 +149,24 @@ class TraverseWaypointsDroneController(DroneController):
             angle_to_vertical: float = np.arccos(np.dot(vg.normalize(offset), np.array([0, -1, 0]))) * 180 / np.pi
             normalized_offset: np.ndarray = vg.normalize(offset)
             # print(offset, normalized_offset, vg.scalar_projection(normalized_offset, cam.n()), vg.scalar_projection(normalized_offset, -cam.u()), vg.scalar_projection(normalized_offset, cam.v()))
-            scale_factor: float = 0.5
-            forward_rate: float = vg.scalar_projection(normalized_offset, cam.n()) * scale_factor
-            right_rate: float = vg.scalar_projection(normalized_offset, -cam.u()) * scale_factor
-            up_rate: float = vg.scalar_projection(normalized_offset, cam.v()) * scale_factor
-            self.__drone.turn(rate)
-            # TODO: Try to actually follow the line.
+            speed: float = 0.5
+            forward_rate: float = vg.scalar_projection(normalized_offset, cam.n()) * speed
+            right_rate: float = vg.scalar_projection(normalized_offset, -cam.u()) * speed
+            up_rate: float = vg.scalar_projection(normalized_offset, cam.v()) * speed
+
             if pygame.key.get_pressed()[pygame.K_c]:
+                self.__drone.turn(rate)
+            else:
+                self.__drone.turn(0.0)
+
+            if pygame.key.get_pressed()[pygame.K_c] and angle * 180 / np.pi <= 90.0:
                 self.__drone.move_forward(forward_rate)
-                # self.__drone.move_right(right_rate)
+                self.__drone.move_right(right_rate)
                 self.__drone.move_up(up_rate)
             else:
-                self.__drone.stop()
-            # self.__drone.move_forward(0.1 if 15 < angle_to_vertical < 165 else 0.0)
-            # self.__drone.move_up(-0.1 * np.sign(offset[1]) if np.fabs(offset[1]) > 0.01 else 0.0)
+                self.__drone.move_forward(0.0)
+                self.__drone.move_right(0.0)
+                self.__drone.move_up(0.0)
         else:
             self.__drone.stop()
 
