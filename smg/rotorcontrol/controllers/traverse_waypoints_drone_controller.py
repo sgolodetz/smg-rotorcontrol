@@ -144,11 +144,22 @@ class TraverseWaypointsDroneController(DroneController):
             rate: float = np.clip(-angle / (np.pi / 2), -1.0, 1.0)
             # print(current_n, target_n, cp, angle, angle * 180 / np.pi, rate)
             angle_to_vertical: float = np.arccos(np.dot(vg.normalize(offset), np.array([0, -1, 0]))) * 180 / np.pi
-            # print(np.linalg.norm(offset))
+            normalized_offset: np.ndarray = vg.normalize(offset)
+            # print(offset, normalized_offset, vg.scalar_projection(normalized_offset, cam.n()), vg.scalar_projection(normalized_offset, -cam.u()), vg.scalar_projection(normalized_offset, cam.v()))
+            scale_factor: float = 0.5
+            forward_rate: float = vg.scalar_projection(normalized_offset, cam.n()) * scale_factor
+            right_rate: float = vg.scalar_projection(normalized_offset, -cam.u()) * scale_factor
+            up_rate: float = vg.scalar_projection(normalized_offset, cam.v()) * scale_factor
             self.__drone.turn(rate)
             # TODO: Try to actually follow the line.
-            self.__drone.move_forward(0.1 if 15 < angle_to_vertical < 165 else 0.0)
-            self.__drone.move_up(-0.1 * np.sign(offset[1]) if np.fabs(offset[1]) > 0.01 else 0.0)
+            if pygame.key.get_pressed()[pygame.K_c]:
+                self.__drone.move_forward(forward_rate)
+                # self.__drone.move_right(right_rate)
+                self.__drone.move_up(up_rate)
+            else:
+                self.__drone.stop()
+            # self.__drone.move_forward(0.1 if 15 < angle_to_vertical < 165 else 0.0)
+            # self.__drone.move_up(-0.1 * np.sign(offset[1]) if np.fabs(offset[1]) > 0.01 else 0.0)
         else:
             self.__drone.stop()
 
@@ -218,7 +229,8 @@ class TraverseWaypointsDroneController(DroneController):
                 path = self.__planner.update_path(
                     current_pos, path, debug=self.__debug,
                     d=PlanningToolkit.l1_distance(ay=ay), h=PlanningToolkit.l1_distance(ay=ay),
-                    allow_shortcuts=True, pull_strings=True, use_clearance=True
+                    allow_shortcuts=True, pull_strings=True, use_clearance=True,
+                    nearest_waypoint_tolerance=0.05
                 )
 
                 if self.__debug:
