@@ -121,6 +121,9 @@ class TraverseWaypointsDroneController(DroneController):
                     self.__current_pos = current_pos
                     self.__planning_is_needed = True
                     self.__planning_needed.notify()
+                else:
+                    # TODO: Possible bug fix - check if needed.
+                    self.__path = None
 
                 # Make a thread-local copy of any existing path that has been planned so that we can use it
                 # without having to hold on to the lock.
