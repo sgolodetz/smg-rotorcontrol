@@ -122,8 +122,8 @@ class TraverseWaypointsDroneController(DroneController):
             return
 
         # TODO
-        if path is not None:
-            print(path)
+        if path is not None and len(path) > 1:  # TODO: Check if the second condition is necessary.
+            print(f"{self.__current_pos} -> {path[1].position}")
 
     def set_waypoints(self, waypoints: List[np.ndarray]) -> None:
         """
