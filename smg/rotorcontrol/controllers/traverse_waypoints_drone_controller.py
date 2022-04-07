@@ -107,12 +107,20 @@ class TraverseWaypointsDroneController(DroneController):
         acquired: bool = self.__planning_lock.acquire(blocking=False)
         if acquired:
             try:
-                # Provide the path planner with the current position of the drone, and tell it that some
-                # path planning is needed.
+                # Extract the current position of the drone from the tracker pose provided.
                 tracker_i_t_c: np.ndarray = np.linalg.inv(tracker_c_t_i)
-                self.__current_pos = tracker_i_t_c[0:3, 3]
-                self.__planning_is_needed = True
-                self.__planning_needed.notify()
+                current_pos: np.ndarray = tracker_i_t_c[0:3, 3]
+
+                # Check whether the drone has reached the first waypoint (if any), and remove it from the list if so.
+                if len(self.__waypoints) > 0 and np.linalg.norm(current_pos - self.__waypoints[0]) < 0.025:
+                    self.__waypoints = self.__waypoints[1:]
+
+                # If there are any waypoints remaining, provide the path planner with the current position of the
+                # drone, and tell it that some path planning is needed.
+                if len(self.__waypoints) > 0:
+                    self.__current_pos = current_pos
+                    self.__planning_is_needed = True
+                    self.__planning_needed.notify()
 
                 # Make a thread-local copy of any existing path that has been planned so that we can use it
                 # without having to hold on to the lock.
@@ -136,10 +144,13 @@ class TraverseWaypointsDroneController(DroneController):
             rate: float = np.clip(-angle / (np.pi / 2), -1.0, 1.0)
             # print(current_n, target_n, cp, angle, angle * 180 / np.pi, rate)
             angle_to_vertical: float = np.arccos(np.dot(vg.normalize(offset), np.array([0, -1, 0]))) * 180 / np.pi
-            print(np.linalg.norm(offset))
+            # print(np.linalg.norm(offset))
             self.__drone.turn(rate)
+            # TODO: Try to actually follow the line.
             self.__drone.move_forward(0.1 if 15 < angle_to_vertical < 165 else 0.0)
             self.__drone.move_up(-0.1 * np.sign(offset[1]) if np.fabs(offset[1]) > 0.01 else 0.0)
+        else:
+            self.__drone.stop()
 
     def set_waypoints(self, waypoints: List[np.ndarray]) -> None:
         """
