@@ -6,12 +6,15 @@ os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame
 import threading
 import time
+import vg
 
 from timeit import default_timer as timer
 from typing import Callable, List, Optional, Tuple
 
 from smg.navigation import AStarPathPlanner, OCS_OCCUPIED, Path, PlanningToolkit
 from smg.pyoctomap import OcTree
+from smg.rigging.cameras import SimpleCamera
+from smg.rigging.helpers import CameraPoseConverter
 from smg.rotory.drones import Drone
 
 from .drone_controller import DroneController
@@ -122,8 +125,21 @@ class TraverseWaypointsDroneController(DroneController):
             return
 
         # TODO
-        if path is not None and len(path) > 1:  # TODO: Check if the second condition is necessary.
-            print(f"{self.__current_pos} -> {path[1].position}")
+        if path is not None:
+            cam: SimpleCamera = CameraPoseConverter.pose_to_camera(tracker_c_t_i)
+            offset: np.ndarray = path[1].position - self.__current_pos
+            current_n: np.ndarray = vg.normalize(np.array([cam.n()[0], 0, cam.n()[2]]))
+            target_n: np.ndarray = vg.normalize(np.array([offset[0], 0, offset[2]]))
+            cp: np.ndarray = np.cross(current_n, target_n)
+            sign: int = 1 if np.dot(cp, np.array([0, -1, 0])) >= 0 else -1
+            angle: float = sign * np.arccos(np.dot(current_n, target_n))
+            rate: float = np.clip(-angle / (np.pi / 2), -1.0, 1.0)
+            # print(current_n, target_n, cp, angle, angle * 180 / np.pi, rate)
+            angle_to_vertical: float = np.arccos(np.dot(vg.normalize(offset), np.array([0, -1, 0]))) * 180 / np.pi
+            print(np.linalg.norm(offset))
+            self.__drone.turn(rate)
+            self.__drone.move_forward(0.1 if 15 < angle_to_vertical < 165 else 0.0)
+            self.__drone.move_up(-0.1 * np.sign(offset[1]) if np.fabs(offset[1]) > 0.01 else 0.0)
 
     def set_waypoints(self, waypoints: List[np.ndarray]) -> None:
         """
@@ -189,7 +205,7 @@ class TraverseWaypointsDroneController(DroneController):
                     start = timer()
 
                 path = self.__planner.update_path(
-                    current_pos, path, debug=True,
+                    current_pos, path, debug=self.__debug,
                     d=PlanningToolkit.l1_distance(ay=ay), h=PlanningToolkit.l1_distance(ay=ay),
                     allow_shortcuts=True, pull_strings=True, use_clearance=True
                 )
