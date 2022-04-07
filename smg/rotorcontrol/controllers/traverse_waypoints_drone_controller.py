@@ -16,7 +16,7 @@ from smg.rotory.drones import Drone
 from .drone_controller import DroneController
 
 
-class FollowWaypointsDroneController(DroneController):
+class TraverseWaypointsDroneController(DroneController):
     """TODO"""
 
     # CONSTRUCTOR
