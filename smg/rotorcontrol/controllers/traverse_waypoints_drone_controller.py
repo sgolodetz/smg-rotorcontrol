@@ -38,7 +38,7 @@ class TraverseWaypointsDroneController(DroneController):
         self.__interpolated_path: Optional[Path] = None
         self.__path: Optional[Path] = None
         self.__planning_lock: threading.Lock = threading.Lock()
-        self.__waypoints: Optional[List[np.ndarray]] = None
+        self.__waypoints: List[np.ndarray] = []
 
         # Construct the planning toolkit.
         self.__planning_toolkit = PlanningToolkit(
@@ -143,10 +143,16 @@ class TraverseWaypointsDroneController(DroneController):
             target_n: np.ndarray = vg.normalize(np.array([offset[0], 0, offset[2]]))
             cp: np.ndarray = np.cross(current_n, target_n)
             sign: int = 1 if np.dot(cp, np.array([0, -1, 0])) >= 0 else -1
-            angle: float = sign * np.arccos(np.dot(current_n, target_n))
+            import warnings
+            with warnings.catch_warnings():
+                warnings.filterwarnings("error")
+                try:
+                    angle: float = sign * np.arccos(np.clip(np.dot(current_n, target_n), -1.0, 1.0))
+                except RuntimeWarning:
+                    print(current_n, target_n, np.dot(current_n, target_n))
             rate: float = np.clip(-angle / (np.pi / 2), -1.0, 1.0)
             # print(current_n, target_n, cp, angle, angle * 180 / np.pi, rate)
-            angle_to_vertical: float = np.arccos(np.dot(vg.normalize(offset), np.array([0, -1, 0]))) * 180 / np.pi
+            angle_to_vertical: float = np.arccos(np.clip(np.dot(vg.normalize(offset), np.array([0, -1, 0])), -1.0, 1.0)) * 180 / np.pi
             normalized_offset: np.ndarray = vg.normalize(offset)
             # print(offset, normalized_offset, vg.scalar_projection(normalized_offset, cam.n()), vg.scalar_projection(normalized_offset, -cam.u()), vg.scalar_projection(normalized_offset, cam.v()))
             speed: float = 0.5
