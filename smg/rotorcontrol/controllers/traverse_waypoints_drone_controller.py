@@ -154,12 +154,13 @@ class TraverseWaypointsDroneController(DroneController):
             right_rate: float = vg.scalar_projection(normalized_offset, -cam.u()) * speed
             up_rate: float = vg.scalar_projection(normalized_offset, cam.v()) * speed
 
-            if pygame.key.get_pressed()[pygame.K_c]:
+            if True:  # pygame.key.get_pressed()[pygame.K_c]:
                 self.__drone.turn(rate)
             else:
                 self.__drone.turn(0.0)
 
-            if pygame.key.get_pressed()[pygame.K_c] and angle * 180 / np.pi <= 90.0:
+            # if pygame.key.get_pressed()[pygame.K_c] and angle * 180 / np.pi <= 90.0:
+            if angle * 180 / np.pi <= 90.0:
                 self.__drone.move_forward(forward_rate)
                 self.__drone.move_right(right_rate)
                 self.__drone.move_up(up_rate)
