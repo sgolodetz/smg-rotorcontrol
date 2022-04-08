@@ -39,6 +39,7 @@ class TraverseWaypointsDroneController(DroneController):
         self.__path: Optional[Path] = None
         self.__planning_lock: threading.Lock = threading.Lock()
         self.__waypoints: List[np.ndarray] = []
+        self.__waypoints_changed: bool = False
 
         # Construct the planning toolkit.
         self.__planning_toolkit = PlanningToolkit(
@@ -48,7 +49,7 @@ class TraverseWaypointsDroneController(DroneController):
         )
 
         # Construct the path planner.
-        self.__planner: AStarPathPlanner = AStarPathPlanner(self.__planning_toolkit, debug=False)
+        self.__planner: AStarPathPlanner = AStarPathPlanner(self.__planning_toolkit, debug=True)
 
         # Set up the path planning thread and its associated variables.
         self.__planning_is_needed: bool = False
@@ -185,6 +186,7 @@ class TraverseWaypointsDroneController(DroneController):
         """
         with self.__planning_lock:
             self.__waypoints = waypoints
+            self.__waypoints_changed = True
 
     def terminate(self) -> None:
         """Destroy the controller."""
@@ -218,11 +220,12 @@ class TraverseWaypointsDroneController(DroneController):
                 interpolated_path: Optional[Path] = self.__interpolated_path
                 path: Optional[Path] = self.__path
                 waypoints: List[np.ndarray] = self.__waypoints.copy()
+                waypoints_changed: bool = self.__waypoints_changed
 
             # If no path has yet been planned through the waypoints, plan one now. Otherwise, if a path already
             # exists, update it based on the agent's current position.
             ay: float = 10
-            if path is None:
+            if path is None or waypoints_changed:
                 if self.__debug:
                     start = timer()
 
