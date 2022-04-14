@@ -137,46 +137,50 @@ class TraverseWaypointsDroneController(DroneController):
             return
 
         # TODO
+        stop_drone: bool = True
+
         if path is not None:
             cam: SimpleCamera = CameraPoseConverter.pose_to_camera(tracker_c_t_i)
             offset: np.ndarray = path[1].position - self.__current_pos
-            current_n: np.ndarray = vg.normalize(np.array([cam.n()[0], 0, cam.n()[2]]))
-            target_n: np.ndarray = vg.normalize(np.array([offset[0], 0, offset[2]]))
-            cp: np.ndarray = np.cross(current_n, target_n)
-            sign: int = 1 if np.dot(cp, np.array([0, -1, 0])) >= 0 else -1
-            import warnings
-            with warnings.catch_warnings():
-                warnings.filterwarnings("error")
-                try:
-                    angle: float = sign * np.arccos(np.clip(np.dot(current_n, target_n), -1.0, 1.0))
-                except RuntimeWarning:
-                    print(current_n, target_n, np.dot(current_n, target_n))
-            rate: float = np.clip(-angle / (np.pi / 2), -1.0, 1.0)
-            # print(current_n, target_n, cp, angle, angle * 180 / np.pi, rate)
-            angle_to_vertical: float = np.arccos(np.clip(np.dot(vg.normalize(offset), np.array([0, -1, 0])), -1.0, 1.0)) * 180 / np.pi
-            normalized_offset: np.ndarray = vg.normalize(offset)
-            # print(offset, normalized_offset, vg.scalar_projection(normalized_offset, cam.n()), vg.scalar_projection(normalized_offset, -cam.u()), vg.scalar_projection(normalized_offset, cam.v()))
-            speed: float = 0.5
-            forward_rate: float = vg.scalar_projection(normalized_offset, cam.n()) * speed
-            right_rate: float = vg.scalar_projection(normalized_offset, -cam.u()) * speed
-            up_rate: float = vg.scalar_projection(normalized_offset, cam.v()) * speed
+            if np.linalg.norm(offset) >= 1e-4:
+                stop_drone = False
 
-            # if pygame.key.get_pressed()[pygame.K_c]:
-            if True:
-                self.__drone.turn(rate)
-            else:
-                self.__drone.turn(0.0)
+                current_n: np.ndarray = vg.normalize(np.array([cam.n()[0], 0, cam.n()[2]]))
+                target_n: np.ndarray = vg.normalize(np.array([offset[0], 0, offset[2]]))
+                cp: np.ndarray = np.cross(current_n, target_n)
+                sign: int = 1 if np.dot(cp, np.array([0, -1, 0])) >= 0 else -1
+                angle: float = 0.0
+                import warnings
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("error")
+                    try:
+                        angle = sign * np.arccos(np.clip(np.dot(current_n, target_n), -1.0, 1.0))
+                    except RuntimeWarning:
+                        print(current_n, target_n, np.dot(current_n, target_n))
+                rate: float = np.clip(-angle / (np.pi / 2), -1.0, 1.0)
+                normalized_offset: np.ndarray = vg.normalize(offset)
+                speed: float = 0.5
+                forward_rate: float = vg.scalar_projection(normalized_offset, cam.n()) * speed
+                right_rate: float = vg.scalar_projection(normalized_offset, -cam.u()) * speed
+                up_rate: float = vg.scalar_projection(normalized_offset, cam.v()) * speed
 
-            # if pygame.key.get_pressed()[pygame.K_c] and angle * 180 / np.pi <= 90.0:
-            if angle * 180 / np.pi <= 90.0:
-                self.__drone.move_forward(forward_rate)
-                self.__drone.move_right(right_rate)
-                self.__drone.move_up(up_rate)
-            else:
-                self.__drone.move_forward(0.0)
-                self.__drone.move_right(0.0)
-                self.__drone.move_up(0.0)
-        else:
+                # if pygame.key.get_pressed()[pygame.K_c]:
+                if True:
+                    self.__drone.turn(rate)
+                else:
+                    self.__drone.turn(0.0)
+
+                # if pygame.key.get_pressed()[pygame.K_c] and angle * 180 / np.pi <= 90.0:
+                if angle * 180 / np.pi <= 90.0:
+                    self.__drone.move_forward(forward_rate)
+                    self.__drone.move_right(right_rate)
+                    self.__drone.move_up(up_rate)
+                else:
+                    self.__drone.move_forward(0.0)
+                    self.__drone.move_right(0.0)
+                    self.__drone.move_up(0.0)
+
+        if stop_drone:
             self.__drone.stop()
 
     def set_waypoints(self, waypoints: List[np.ndarray]) -> None:
