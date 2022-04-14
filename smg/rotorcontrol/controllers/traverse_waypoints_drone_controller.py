@@ -161,7 +161,8 @@ class TraverseWaypointsDroneController(DroneController):
             right_rate: float = vg.scalar_projection(normalized_offset, -cam.u()) * speed
             up_rate: float = vg.scalar_projection(normalized_offset, cam.v()) * speed
 
-            if True:  # pygame.key.get_pressed()[pygame.K_c]:
+            # if pygame.key.get_pressed()[pygame.K_c]:
+            if True:
                 self.__drone.turn(rate)
             else:
                 self.__drone.turn(0.0)
@@ -235,13 +236,6 @@ class TraverseWaypointsDroneController(DroneController):
                     allow_shortcuts=True, pull_strings=True, use_clearance=True
                 )
 
-                if path is None:
-                    path = self.__planner.plan_multi_step_path(
-                        [current_pos] + waypoints,
-                        d=PlanningToolkit.l1_distance(ay=ay), h=PlanningToolkit.l1_distance(ay=ay),
-                        allow_shortcuts=True, pull_strings=True, use_clearance=False
-                    )
-
                 if self.__debug:
                     end = timer()
                     # noinspection PyUnboundLocalVariable
@@ -250,22 +244,12 @@ class TraverseWaypointsDroneController(DroneController):
                 if self.__debug:
                     start = timer()
 
-                new_path: Optional[Path] = self.__planner.update_path(
+                path = self.__planner.update_path(
                     current_pos, path, debug=self.__debug,
                     d=PlanningToolkit.l1_distance(ay=ay), h=PlanningToolkit.l1_distance(ay=ay),
                     allow_shortcuts=True, pull_strings=True, use_clearance=True,
-                    nearest_waypoint_tolerance=0.05
+                    nearest_waypoint_tolerance=0.025
                 )
-
-                if new_path is None:
-                    new_path = self.__planner.update_path(
-                        current_pos, path, debug=self.__debug,
-                        d=PlanningToolkit.l1_distance(ay=ay), h=PlanningToolkit.l1_distance(ay=ay),
-                        allow_shortcuts=True, pull_strings=True, use_clearance=False,
-                        nearest_waypoint_tolerance=0.05
-                    )
-
-                path = new_path
 
                 if self.__debug:
                     end = timer()
@@ -288,6 +272,7 @@ class TraverseWaypointsDroneController(DroneController):
                 self.__interpolated_path = interpolated_path
                 self.__path = path
                 self.__planning_is_needed = False
+                self.__waypoints_changed = False
 
             # Wait for 10ms before performing any further path planning, so as to avoid a spin loop.
             time.sleep(0.01)
