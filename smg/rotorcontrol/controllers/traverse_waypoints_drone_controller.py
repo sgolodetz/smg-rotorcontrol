@@ -142,7 +142,8 @@ class TraverseWaypointsDroneController(DroneController):
         if path is not None:
             cam: SimpleCamera = CameraPoseConverter.pose_to_camera(tracker_c_t_i)
             offset: np.ndarray = path[1].position - self.__current_pos
-            if np.linalg.norm(offset) >= 1e-4:
+            offset_length: float = np.linalg.norm(offset)
+            if offset_length >= 1e-4:
                 stop_drone = False
 
                 current_n: np.ndarray = vg.normalize(np.array([cam.n()[0], 0, cam.n()[2]]))
@@ -157,16 +158,16 @@ class TraverseWaypointsDroneController(DroneController):
                         angle = sign * np.arccos(np.clip(np.dot(current_n, target_n), -1.0, 1.0))
                     except RuntimeWarning:
                         print(current_n, target_n, np.dot(current_n, target_n))
-                rate: float = np.clip(-angle / (np.pi / 2), -1.0, 1.0)
-                normalized_offset: np.ndarray = vg.normalize(offset)
-                speed: float = 0.5
+                turn_rate: float = np.clip(-angle / (np.pi / 2), -1.0, 1.0)
+                normalized_offset: np.ndarray = offset / offset_length
+                speed: float = 1.0
                 forward_rate: float = vg.scalar_projection(normalized_offset, cam.n()) * speed
                 right_rate: float = vg.scalar_projection(normalized_offset, -cam.u()) * speed
                 up_rate: float = vg.scalar_projection(normalized_offset, cam.v()) * speed
 
                 # if pygame.key.get_pressed()[pygame.K_c]:
                 if True:
-                    self.__drone.turn(rate)
+                    self.__drone.turn(turn_rate)
                 else:
                     self.__drone.turn(0.0)
 
@@ -227,10 +228,9 @@ class TraverseWaypointsDroneController(DroneController):
                 waypoints: List[np.ndarray] = self.__waypoints.copy()
                 waypoints_changed: bool = self.__waypoints_changed
 
-            # If no path has yet been planned through the waypoints, plan one now. Otherwise, if a path already
-            # exists, update it based on the agent's current position.
+            # If no path has yet been planned through the waypoints, plan one now.
             ay: float = 10
-            if path is None or waypoints_changed:
+            if waypoints_changed:
                 if self.__debug:
                     start = timer()
 
@@ -244,7 +244,9 @@ class TraverseWaypointsDroneController(DroneController):
                     end = timer()
                     # noinspection PyUnboundLocalVariable
                     print(f"Path Planning: {end - start}s")
-            elif len(path) > 1:
+
+            # Otherwise, if a path already exists, update it based on the agent's current position.
+            elif path is not None:
                 if self.__debug:
                     start = timer()
 
