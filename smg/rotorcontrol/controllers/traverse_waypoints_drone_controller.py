@@ -160,7 +160,7 @@ class TraverseWaypointsDroneController(DroneController):
                         print(current_n, target_n, np.dot(current_n, target_n))
                 turn_rate: float = np.clip(-angle / (np.pi / 2), -1.0, 1.0)
                 normalized_offset: np.ndarray = offset / offset_length
-                speed: float = 1.0
+                speed: float = 0.5
                 forward_rate: float = vg.scalar_projection(normalized_offset, cam.n()) * speed
                 right_rate: float = vg.scalar_projection(normalized_offset, -cam.u()) * speed
                 up_rate: float = vg.scalar_projection(normalized_offset, cam.v()) * speed
