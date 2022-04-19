@@ -36,10 +36,10 @@ class DroneController(ABC):
     # PUBLIC METHODS
 
     # noinspection PyMethodMayBeStatic
-    def should_quit(self) -> bool:
+    def has_finished(self) -> bool:
         """
-        Get whether or not the controller currently wants the program to quit.
+        Get whether or not the controller has finished.
 
-        :return:    True, if the controller wants the program to quit, or False otherwise.
+        :return:    True, if the controller has finished, or False otherwise.
         """
         return False

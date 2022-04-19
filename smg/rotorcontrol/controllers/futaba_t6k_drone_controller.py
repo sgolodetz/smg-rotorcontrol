@@ -42,6 +42,15 @@ class FutabaT6KDroneController(DroneController):
 
     # PUBLIC METHODS
 
+    def has_finished(self) -> bool:
+        """
+        Get whether or not the controller has finished.
+
+        :return:    True, if the controller has finished, or False otherwise.
+        """
+        # The controller has finished if both Button 0 and Button 1 on the Futaba T6K are set to their "released" state.
+        return self.__joystick.get_button(0) == 0 and self.__joystick.get_button(1) == 0
+
     def iterate(self, *, altitude: Optional[float] = None, events: Optional[List[pygame.event.Event]] = None,
                 image: np.ndarray, image_timestamp: Optional[float] = None,
                 intrinsics: Tuple[float, float, float, float], tracker_c_t_i: Optional[np.ndarray] = None) -> None:
@@ -93,12 +102,3 @@ class FutabaT6KDroneController(DroneController):
         # Note that the throttle value is in [0,1], so we rescale it to a value in [-1,1] as a first step.
         if self.__can_move_gimbal:
             self.__drone.update_gimbal_pitch(2 * (self.__joystick.get_throttle() - 0.5))
-
-    def should_quit(self) -> bool:
-        """
-        Get whether or not the controller currently wants the program to quit.
-
-        :return:    True, if the controller wants the program to quit, or False otherwise.
-        """
-        # Ask the program to quit if both Button 0 and Button 1 on the Futaba T6K are set to their "released" state.
-        return self.__joystick.get_button(0) == 0 and self.__joystick.get_button(1) == 0
