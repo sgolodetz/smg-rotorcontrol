@@ -49,7 +49,7 @@ class TraverseWaypointsDroneController(DroneController):
         )
 
         # Construct the path planner.
-        self.__planner: AStarPathPlanner = AStarPathPlanner(self.__planning_toolkit, debug=False)
+        self.__planner: AStarPathPlanner = AStarPathPlanner(self.__planning_toolkit, debug=True)
 
         # Set up the path planning thread and its associated variables.
         self.__planning_is_needed: bool = False
@@ -76,6 +76,10 @@ class TraverseWaypointsDroneController(DroneController):
         """TODO"""
         with self.__planning_lock:
             return self.__path.copy() if self.__path is not None else None
+
+    def get_planning_toolkit(self) -> PlanningToolkit:
+        """TODO"""
+        return self.__planning_toolkit
 
     def iterate(self, *, altitude: Optional[float] = None, events: Optional[List[pygame.event.Event]] = None,
                 image: np.ndarray, image_timestamp: Optional[float] = None,

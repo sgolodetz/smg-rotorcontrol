@@ -62,6 +62,9 @@ class RTSStyleDroneController(DroneController):
         if picking_mask[my, mx] != 0:
             self.__picker_pos = picking_image[my, mx] + np.array([0, -self.__height_offset, 0])
 
+            # TODO
+            self.__picker_pos = self.__inner_controller.get_planning_toolkit().pos_to_vpos(self.__picker_pos)
+
         # If no PyGame events were passed in, use an empty list of events as the default.
         if events is None:
             events = []
@@ -74,7 +77,7 @@ class RTSStyleDroneController(DroneController):
 
             # TODO
             elif event.type == pygame.MOUSEWHEEL:
-                self.__height_offset = np.clip(self.__height_offset + event.y * 0.1, 0.2, 3.0)
+                self.__height_offset = np.clip(self.__height_offset + event.y * 0.2, 0.3, 3.0)
 
         # TODO
         self.__inner_controller.iterate(**kwargs)
