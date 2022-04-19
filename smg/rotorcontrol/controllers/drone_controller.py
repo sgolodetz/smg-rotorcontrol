@@ -43,3 +43,7 @@ class DroneController(ABC):
         :return:    True, if the controller has finished, or False otherwise.
         """
         return False
+
+    def render_ui(self) -> None:
+        """TODO"""
+        pass
