@@ -24,6 +24,7 @@ class RTSStyleDroneController(DroneController):
 
     def __init__(self, *, debug: bool = False, drone: Drone, intrinsics: Tuple[float, float, float, float],
                  planning_octree: OcTree, scene_octree: OcTree, viewing_camera: Camera, window_size: Tuple[int, int]):
+        self.__height_offset: float = 0.5
         self.__inner_controller: TraverseWaypointsDroneController = TraverseWaypointsDroneController(
             debug=debug, drone=drone, planning_octree=planning_octree
         )
@@ -59,7 +60,7 @@ class RTSStyleDroneController(DroneController):
         )
         mx, my = pygame.mouse.get_pos()
         if picking_mask[my, mx] != 0:
-            self.__picker_pos = picking_image[my, mx] + np.array([0, -0.5, 0])
+            self.__picker_pos = picking_image[my, mx] + np.array([0, -self.__height_offset, 0])
 
         # If no PyGame events were passed in, use an empty list of events as the default.
         if events is None:
@@ -70,6 +71,10 @@ class RTSStyleDroneController(DroneController):
             # TODO
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.__picker_pos is not None:
                 self.__inner_controller.set_waypoints([self.__picker_pos])
+
+            # TODO
+            elif event.type == pygame.MOUSEWHEEL:
+                self.__height_offset = np.clip(self.__height_offset + event.y * 0.1, 0.2, 3.0)
 
         # TODO
         self.__inner_controller.iterate(**kwargs)
