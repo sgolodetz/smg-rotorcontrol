@@ -18,12 +18,23 @@ from .traverse_waypoints_drone_controller import TraverseWaypointsDroneControlle
 
 
 class RTSStyleDroneController(DroneController):
-    """TODO"""
+    """An RTS("real-time strategy")-style flight controller for a drone."""
 
     # CONSTRUCTOR
 
     def __init__(self, *, debug: bool = False, drone: Drone, intrinsics: Tuple[float, float, float, float],
                  planning_octree: OcTree, scene_octree: OcTree, viewing_camera: Camera, window_size: Tuple[int, int]):
+        """
+        Construct an RTS-style flight controller for a drone.
+
+        :param debug:           Whether to enable debugging.
+        :param drone:           The drone.
+        :param intrinsics:      The intrinsics of the virtual camera being used to view the scene.
+        :param planning_octree: The planning octree (used for path planning).
+        :param scene_octree:    The scene octree (used for picking).
+        :param viewing_camera:  The virtual camera being used to view the scene.
+        :param window_size:     The size of the window being used to view the scene.
+        """
         self.__height_offset: float = 0.5
         self.__inner_controller: TraverseWaypointsDroneController = TraverseWaypointsDroneController(
             debug=debug, drone=drone, planning_octree=planning_octree
@@ -80,6 +91,7 @@ class RTSStyleDroneController(DroneController):
         self.__inner_controller.iterate(**kwargs)
 
     def render_ui(self) -> None:
+        """Render the user interface for the controller."""
         # TODO
         # interpolated_path: Optional[Path] = self.__inner_controller.get_interpolated_path()
         path: Optional[Path] = self.__inner_controller.get_path()

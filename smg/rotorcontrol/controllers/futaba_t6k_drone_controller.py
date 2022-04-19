@@ -2,27 +2,26 @@ import numpy as np
 import os
 
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
-# noinspection PyPackageRequirements
 import pygame
 
 from typing import List, Optional, Tuple
 
 from smg.joysticks import FutabaT6K
+from smg.rotory.drones import Drone
 
 from .drone_controller import DroneController
-from smg.rotory.drones import Drone
 
 
 class FutabaT6KDroneController(DroneController):
-    """TODO"""
+    """A Futaba T6K-based flight controller for a drone."""
 
     # CONSTRUCTOR
 
     def __init__(self, *, drone: Drone):
         """
-        TODO
+        Construct a Futaba T6K-based flight controller for a drone.
 
-        :param drone:   TODO
+        :param drone:   The drone.
         """
         self.__can_move_gimbal: bool = False
         self.__drone: Drone = drone
@@ -67,11 +66,11 @@ class FutabaT6KDroneController(DroneController):
                                     by any tracker that's running (optional). Note that if the tracker is a monocular
                                     one, the transformation will be non-metric.
         """
-        # TODO
+        # If no PyGame events were passed in, use an empty list of events as the default.
         if events is None:
             events = []
 
-        # TODO
+        # Process any PyGame events that have happened since the last iteration.
         for event in events:
             if event.type == pygame.JOYBUTTONDOWN:
                 # If Button 0 on the Futaba T6K is set to its "pressed" state, take off.
