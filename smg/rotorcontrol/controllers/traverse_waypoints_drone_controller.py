@@ -21,11 +21,28 @@ from .drone_controller import DroneController
 
 
 class TraverseWaypointsDroneController(DroneController):
-    """TODO"""
+    """
+    A flight controller for a drone that tries to traverse a specified set of waypoints.
+
+    .. note::
+        The waypoints can be changed on-the-fly as desired.
+    """
 
     # CONSTRUCTOR
 
     def __init__(self, *, debug: bool = False, drone: Drone, planning_octree: OcTree):
+        """
+        Construct a flight controller for a drone that tries to traverse a specified set of waypoints.
+
+        .. note::
+            The actual waypoints must be set later via a call to the set_waypoints method.
+        .. note::
+            The planning octree is not thread-safe and *must not* be used by multiple drone controllers at once.
+
+        :param debug:           Whether to enable debugging.
+        :param drone:           The drone.
+        :param planning_octree: The planning octree (used for path planning).
+        """
         self.__alive: bool = False
 
         self.__debug: bool = debug
@@ -64,16 +81,16 @@ class TraverseWaypointsDroneController(DroneController):
     # PUBLIC METHODS
 
     def get_interpolated_path(self) -> Optional[Path]:
-        """TODO"""
+        """Get a copy of the interpolated version of the current path (if any), or None otherwise."""
         with self.__planning_lock:
             return self.__interpolated_path.copy() if self.__interpolated_path is not None else None
 
     def get_occupancy_colourer(self) -> Callable[[np.ndarray], np.ndarray]:
-        """TODO"""
+        """Get a function that can be used to colour waypoints on a path based on their occupancy status."""
         return self.__planning_toolkit.occupancy_colourer()
 
     def get_path(self) -> Optional[Path]:
-        """TODO"""
+        """Get a copy of the current path (if any), or None otherwise."""
         with self.__planning_lock:
             return self.__path.copy() if self.__path is not None else None
 
@@ -101,7 +118,7 @@ class TraverseWaypointsDroneController(DroneController):
                                     by any tracker that's running (optional). Note that if the tracker is a monocular
                                     one, the transformation will be non-metric.
         """
-        # TODO
+        # If no tracker pose has been passed in, raise an exception and early out.
         if tracker_c_t_i is None:
             raise RuntimeError("Tracker poses must be provided when using 'traverse waypoints' control")
 
@@ -126,14 +143,16 @@ class TraverseWaypointsDroneController(DroneController):
                     self.__current_pos = current_pos
                     self.__planning_is_needed = True
                     self.__planning_needed.notify()
+
+                # TODO: Possible bug fix - check if needed.
                 else:
-                    # TODO: Possible bug fix - check if needed.
                     self.__path = None
 
                 # Make a thread-local copy of any existing path that has been planned so that we can use it
                 # without having to hold on to the lock.
                 path = self.__path.copy() if self.__path is not None else None
             finally:
+                # Make sure that the planning lock is released before carrying on.
                 self.__planning_lock.release()
 
         # Otherwise, early out.
@@ -190,9 +209,9 @@ class TraverseWaypointsDroneController(DroneController):
 
     def set_waypoints(self, waypoints: List[np.ndarray]) -> None:
         """
-        TODO
+        Set the waypoints that the drone should traverse.
 
-        :param waypoints:   TODO
+        :param waypoints:   The waypoints that the drone should traverse.
         """
         with self.__planning_lock:
             self.__waypoints = waypoints

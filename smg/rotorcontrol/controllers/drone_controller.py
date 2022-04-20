@@ -45,5 +45,5 @@ class DroneController(ABC):
         return False
 
     def render_ui(self) -> None:
-        """TODO"""
+        """Render the user interface for the controller."""
         pass
