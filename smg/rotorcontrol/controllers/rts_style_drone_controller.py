@@ -6,7 +6,7 @@ import pygame
 from OpenGL.GL import *
 from typing import Any, Dict
 
-from smg.navigation import Path
+from smg.navigation import Path, PathNode, PlanningToolkit
 from smg.opengl import OpenGLUtil
 from smg.pyoctomap import OctomapPicker, OcTree
 from smg.rigging.cameras import Camera
@@ -113,7 +113,15 @@ class RTSStyleDroneController(DroneController):
             # )
 
         if self.__goal_pos is not None:
-            glColor3f(0, 1, 0)
+            toolkit: PlanningToolkit = self.__inner_controller.get_planning_toolkit()
+            goal_node: PathNode = toolkit.pos_to_node(self.__goal_pos)
+            if toolkit.node_is_traversable(goal_node, use_clearance=True):
+                glColor3f(0, 1, 0)
+            elif toolkit.node_is_traversable(goal_node, use_clearance=False):
+                glColor3f(1, 0.5, 0)
+            else:
+                glColor3f(1, 0, 0)
+
             glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
             OpenGLUtil.render_sphere(self.__goal_pos, 0.1, slices=10, stacks=10)
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
