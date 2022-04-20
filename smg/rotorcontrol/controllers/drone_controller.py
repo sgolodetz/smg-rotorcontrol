@@ -47,3 +47,7 @@ class DroneController(ABC):
     def render_ui(self) -> None:
         """Render the user interface for the controller."""
         pass
+
+    def terminate(self) -> None:
+        """Tell the controller to terminate."""
+        pass

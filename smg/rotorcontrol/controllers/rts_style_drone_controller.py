@@ -133,3 +133,7 @@ class RTSStyleDroneController(DroneController):
             glVertex3f(*self.__goal_pos)
             glEnd()
             glLineWidth(1)
+
+    def terminate(self) -> None:
+        """Tell the controller to terminate."""
+        self.__inner_controller.terminate()
