@@ -66,7 +66,7 @@ class TraverseWaypointsDroneController(DroneController):
         )
 
         # Construct the path planner.
-        self.__planner: AStarPathPlanner = AStarPathPlanner(self.__planning_toolkit, debug=True)
+        self.__planner: AStarPathPlanner = AStarPathPlanner(self.__planning_toolkit, debug=False)
 
         # Set up the path planning thread and its associated variables.
         self.__planning_is_needed: bool = False
