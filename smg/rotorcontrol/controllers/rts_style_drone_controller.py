@@ -71,7 +71,8 @@ class RTSStyleDroneController(DroneController):
             np.linalg.inv(CameraPoseConverter.camera_to_pose(self.__viewing_camera))
         )
         mx, my = pygame.mouse.get_pos()
-        if picking_mask[my, mx] != 0:
+        # noinspection PyChainedComparisons
+        if 0 <= mx < picking_mask.shape[1] and 0 <= my < picking_mask.shape[0] and picking_mask[my, mx] != 0:
             self.__picker_pos = picking_image[my, mx]
             self.__picker_pos = self.__inner_controller.get_planning_toolkit().pos_to_vpos(self.__picker_pos)
             self.__goal_pos = self.__picker_pos + np.array([0, -self.__height_offset, 0])
