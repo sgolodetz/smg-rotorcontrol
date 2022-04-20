@@ -69,9 +69,9 @@ class KeyboardDroneController(DroneController):
 
         # Allow the user to control the left/right turning movement of the drone.
         if pressed_keys[pygame.K_j] and pressed_keys[pygame.K_LSHIFT]:
-            self.__drone.turn(-1.0)
+            self.__drone.turn(-0.5)
         elif pressed_keys[pygame.K_l] and pressed_keys[pygame.K_LSHIFT]:
-            self.__drone.turn(1.0)
+            self.__drone.turn(0.5)
         else:
             self.__drone.turn(0.0)
 
