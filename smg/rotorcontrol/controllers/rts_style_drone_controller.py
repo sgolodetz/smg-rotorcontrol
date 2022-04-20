@@ -35,6 +35,7 @@ class RTSStyleDroneController(DroneController):
         :param viewing_camera:  The virtual camera being used to view the scene.
         :param window_size:     The size of the window being used to view the scene.
         """
+        self.__goal_pos: Optional[np.ndarray] = None
         self.__height_offset: float = 0.5
         self.__inner_controller: TraverseWaypointsDroneController = TraverseWaypointsDroneController(
             debug=debug, drone=drone, planning_octree=planning_octree
@@ -71,10 +72,12 @@ class RTSStyleDroneController(DroneController):
         )
         mx, my = pygame.mouse.get_pos()
         if picking_mask[my, mx] != 0:
-            self.__picker_pos = picking_image[my, mx] + np.array([0, -self.__height_offset, 0])
-
-            # TODO
+            self.__picker_pos = picking_image[my, mx]
             self.__picker_pos = self.__inner_controller.get_planning_toolkit().pos_to_vpos(self.__picker_pos)
+            self.__goal_pos = self.__picker_pos + np.array([0, -self.__height_offset, 0])
+        else:
+            self.__picker_pos = None
+            self.__goal_pos = None
 
         # If no PyGame events were passed in, use an empty list of events as the default.
         if events is None:
@@ -83,8 +86,8 @@ class RTSStyleDroneController(DroneController):
         # Process any PyGame events that have happened since the last iteration.
         for event in events:
             # TODO
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.__picker_pos is not None:
-                self.__inner_controller.set_waypoints([self.__picker_pos])
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.__goal_pos is not None:
+                self.__inner_controller.set_waypoints([self.__goal_pos])
 
             # TODO
             elif event.type == pygame.MOUSEWHEEL:
@@ -108,8 +111,16 @@ class RTSStyleDroneController(DroneController):
             #     waypoint_colourer=None
             # )
 
-        if self.__picker_pos is not None:
+        if self.__goal_pos is not None:
             glColor3f(0, 1, 0)
             glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
-            OpenGLUtil.render_sphere(self.__picker_pos, 0.1, slices=10, stacks=10)
+            OpenGLUtil.render_sphere(self.__goal_pos, 0.1, slices=10, stacks=10)
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
+
+            glLineWidth(5)
+            glColor3f(1, 0, 0)
+            glBegin(GL_LINES)
+            glVertex3f(*self.__picker_pos)
+            glVertex3f(*self.__goal_pos)
+            glEnd()
+            glLineWidth(1)

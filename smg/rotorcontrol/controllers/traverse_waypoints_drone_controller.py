@@ -263,6 +263,13 @@ class TraverseWaypointsDroneController(DroneController):
                     allow_shortcuts=True, pull_strings=True, use_clearance=True
                 )
 
+                if path is None:
+                    path = self.__planner.plan_multi_step_path(
+                        [current_pos] + waypoints,
+                        d=PlanningToolkit.l1_distance(ay=ay), h=PlanningToolkit.l1_distance(ay=ay),
+                        allow_shortcuts=True, pull_strings=True, use_clearance=False
+                    )
+
                 if self.__debug:
                     end = timer()
                     # noinspection PyUnboundLocalVariable
@@ -273,12 +280,22 @@ class TraverseWaypointsDroneController(DroneController):
                 if self.__debug:
                     start = timer()
 
-                path = self.__planner.update_path(
+                new_path: Optional[Path] = self.__planner.update_path(
                     current_pos, path, debug=self.__debug,
                     d=PlanningToolkit.l1_distance(ay=ay), h=PlanningToolkit.l1_distance(ay=ay),
                     allow_shortcuts=True, pull_strings=True, use_clearance=True,
                     nearest_waypoint_tolerance=0.025
                 )
+
+                if new_path is None:
+                    new_path = self.__planner.update_path(
+                        current_pos, path, debug=self.__debug,
+                        d=PlanningToolkit.l1_distance(ay=ay), h=PlanningToolkit.l1_distance(ay=ay),
+                        allow_shortcuts=True, pull_strings=True, use_clearance=False,
+                        nearest_waypoint_tolerance=0.025
+                    )
+
+                path = new_path
 
                 if self.__debug:
                     end = timer()
