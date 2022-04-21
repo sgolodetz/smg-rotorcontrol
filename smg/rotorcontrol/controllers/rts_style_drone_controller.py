@@ -106,7 +106,7 @@ class RTSStyleDroneController(DroneController):
     def render_ui(self) -> None:
         """Render the user interface for the controller."""
         # TODO
-        path: Optional[Path] = self.__inner_controller.get_path()
+        path: Optional[Path] = self.__inner_controller.get_current_path()
         if path is not None:
             path.render(
                 start_colour=(0, 1, 1), end_colour=(0, 1, 1), width=5,
