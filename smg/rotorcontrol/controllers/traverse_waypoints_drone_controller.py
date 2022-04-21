@@ -279,7 +279,7 @@ class TraverseWaypointsDroneController(DroneController):
 
             # Determine whether we're appending to the path or replacing it, and set the waypoints for which
             # to perform path planning accordingly.
-            appending_waypoints: bool = new_waypoint_count > 0 and new_waypoint_count != len(waypoints)
+            appending_waypoints: bool = new_waypoint_count != len(waypoints)
             if appending_waypoints:
                 waypoints_to_plan: List[np.ndarray] = waypoints[-new_waypoint_count - 1:]
             else:
