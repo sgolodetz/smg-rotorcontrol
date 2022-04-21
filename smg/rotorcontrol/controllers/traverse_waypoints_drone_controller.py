@@ -44,13 +44,14 @@ class TraverseWaypointsDroneController(DroneController):
         self.__alive: bool = False
 
         self.__ay: float = 10
+        self.__current_path: Optional[Path] = None
         self.__debug: bool = debug
         self.__drone: Drone = drone
+        self.__flight_allowed: bool = True
         self.__planning_octree: OcTree = planning_octree
         self.__should_terminate: threading.Event = threading.Event()
 
         # The path planning variables, together with their lock.
-        self.__current_path: Optional[Path] = None
         self.__current_pos: Optional[np.ndarray] = None
         self.__new_path_available: bool = False
         self.__new_waypoint_count: int = 0
@@ -125,6 +126,13 @@ class TraverseWaypointsDroneController(DroneController):
         # If no tracker pose has been passed in, raise an exception and early out.
         if tracker_c_t_i is None:
             raise RuntimeError("Tracker poses must be provided when using 'traverse waypoints' control")
+
+        # Process any PyGame events that have happened since the last iteration.
+        for event in events:
+            if event.type == pygame.KEYDOWN:
+                # If the user presses the 'space' key, toggle whether flight is allowed.
+                if event.key == pygame.K_SPACE:
+                    self.__flight_allowed = not self.__flight_allowed
 
         # Extract the current position of the drone from the tracker pose provided.
         tracker_i_t_c: np.ndarray = np.linalg.inv(tracker_c_t_i)
@@ -218,13 +226,13 @@ class TraverseWaypointsDroneController(DroneController):
                 up_rate: float = vg.scalar_projection(normalized_offset, cam.v()) * speed
 
                 # if pygame.key.get_pressed()[pygame.K_c]:
-                if True:
+                if self.__flight_allowed:
                     self.__drone.turn(turn_rate)
                 else:
                     self.__drone.turn(0.0)
 
                 # if pygame.key.get_pressed()[pygame.K_c] and angle * 180 / np.pi <= 90.0:
-                if angle * 180 / np.pi <= 90.0:
+                if self.__flight_allowed and angle * 180 / np.pi <= 90.0:
                     self.__drone.move_forward(forward_rate)
                     self.__drone.move_right(right_rate)
                     self.__drone.move_up(up_rate)
