@@ -106,17 +106,12 @@ class RTSStyleDroneController(DroneController):
     def render_ui(self) -> None:
         """Render the user interface for the controller."""
         # TODO
-        # interpolated_path: Optional[Path] = self.__inner_controller.get_interpolated_path()
         path: Optional[Path] = self.__inner_controller.get_path()
         if path is not None:
             path.render(
                 start_colour=(0, 1, 1), end_colour=(0, 1, 1), width=5,
                 waypoint_colourer=self.__inner_controller.get_occupancy_colourer()
             )
-            # interpolated_path.render(
-            #     start_colour=(1, 1, 0), end_colour=(1, 0, 1), width=5,
-            #     waypoint_colourer=None
-            # )
 
         if self.__goal_pos is not None:
             toolkit: PlanningToolkit = self.__inner_controller.get_planning_toolkit()
