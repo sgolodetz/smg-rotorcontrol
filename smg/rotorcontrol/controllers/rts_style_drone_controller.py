@@ -88,7 +88,13 @@ class RTSStyleDroneController(DroneController):
         for event in events:
             # TODO
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.__goal_pos is not None:
-                self.__inner_controller.set_waypoints([self.__goal_pos])
+                # TODO
+                if pygame.key.get_mods() & pygame.KMOD_SHIFT:
+                    self.__inner_controller.append_waypoints([self.__goal_pos])
+
+                # TODO
+                else:
+                    self.__inner_controller.set_waypoints([self.__goal_pos])
 
             # TODO
             elif event.type == pygame.MOUSEWHEEL:

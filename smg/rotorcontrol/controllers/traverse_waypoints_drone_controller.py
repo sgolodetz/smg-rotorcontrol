@@ -53,10 +53,10 @@ class TraverseWaypointsDroneController(DroneController):
         # The path planning variables, together with their lock.
         self.__current_pos: Optional[np.ndarray] = None
         self.__interpolated_path: Optional[Path] = None
+        self.__new_waypoint_count: int = 0
         self.__path: Optional[Path] = None
         self.__planning_lock: threading.Lock = threading.Lock()
         self.__waypoints: List[np.ndarray] = []
-        self.__waypoints_changed: bool = False
 
         # Construct the planning toolkit.
         self.__planning_toolkit = PlanningToolkit(
@@ -79,6 +79,16 @@ class TraverseWaypointsDroneController(DroneController):
         self.__alive = True
 
     # PUBLIC METHODS
+
+    def append_waypoints(self, new_waypoints: List[np.ndarray]) -> None:
+        """
+        Append one or more waypoints to the list of waypoints that the drone should traverse.
+
+        :param new_waypoints:   The new waypoints to append.
+        """
+        with self.__planning_lock:
+            self.__waypoints += new_waypoints
+            self.__new_waypoint_count += len(new_waypoints)
 
     def get_interpolated_path(self) -> Optional[Path]:
         """Get a copy of the interpolated version of the current path (if any), or None otherwise."""
@@ -134,19 +144,16 @@ class TraverseWaypointsDroneController(DroneController):
                 current_pos: np.ndarray = tracker_i_t_c[0:3, 3]
 
                 # Check whether the drone has reached the first waypoint (if any), and remove it from the list if so.
+                # FIXME: Stop hard-coding the threshold here.
                 if len(self.__waypoints) > 0 and np.linalg.norm(current_pos - self.__waypoints[0]) < 0.025:
                     self.__waypoints = self.__waypoints[1:]
 
-                # If there are any waypoints remaining, provide the path planner with the current position of the
-                # drone, and tell it that some path planning is needed.
-                if len(self.__waypoints) > 0:
+                # If either (i) there's an existing path, or (ii) there are any waypoints remaining, provide the path
+                # planner with the current position of the drone, and tell it that some path planning is needed.
+                if self.__path is not None or len(self.__waypoints) > 0:
                     self.__current_pos = current_pos
                     self.__planning_is_needed = True
                     self.__planning_needed.notify()
-
-                # TODO: Possible bug fix - check if needed.
-                else:
-                    self.__path = None
 
                 # Make a thread-local copy of any existing path that has been planned so that we can use it
                 # without having to hold on to the lock.
@@ -214,8 +221,8 @@ class TraverseWaypointsDroneController(DroneController):
         :param waypoints:   The waypoints that the drone should traverse.
         """
         with self.__planning_lock:
-            self.__waypoints = waypoints
-            self.__waypoints_changed = True
+            self.__waypoints = waypoints.copy()
+            self.__new_waypoint_count = len(waypoints)
 
     def terminate(self) -> None:
         """Destroy the controller."""
@@ -247,25 +254,35 @@ class TraverseWaypointsDroneController(DroneController):
 
                 current_pos: Optional[np.ndarray] = self.__current_pos.copy()
                 interpolated_path: Optional[Path] = self.__interpolated_path
+                new_waypoint_count: int = self.__new_waypoint_count
                 path: Optional[Path] = self.__path
                 waypoints: List[np.ndarray] = self.__waypoints.copy()
-                waypoints_changed: bool = self.__waypoints_changed
 
-            # If no path has yet been planned through the waypoints, plan one now.
+            # TODO
+            appending_waypoints: bool = new_waypoint_count > 0 and new_waypoint_count != len(waypoints)
+            new_path: Optional[Path] = None
+
+            # If the waypoints have been modified since the path was last planned, replan it now.
             ay: float = 10
-            if waypoints_changed:
+            if new_waypoint_count > 0:
+                # TODO
+                if appending_waypoints:
+                    waypoints_to_plan: List[np.ndarray] = waypoints[-new_waypoint_count - 1:]
+                else:
+                    waypoints_to_plan: List[np.ndarray] = [current_pos] + waypoints
+
                 if self.__debug:
                     start = timer()
 
-                path = self.__planner.plan_multi_step_path(
-                    [current_pos] + waypoints,
+                new_path = self.__planner.plan_multi_step_path(
+                    waypoints_to_plan,
                     d=PlanningToolkit.l1_distance(ay=ay), h=PlanningToolkit.l1_distance(ay=ay),
                     allow_shortcuts=True, pull_strings=True, use_clearance=True
                 )
 
-                if path is None:
-                    path = self.__planner.plan_multi_step_path(
-                        [current_pos] + waypoints,
+                if new_path is None:
+                    new_path = self.__planner.plan_multi_step_path(
+                        waypoints_to_plan,
                         d=PlanningToolkit.l1_distance(ay=ay), h=PlanningToolkit.l1_distance(ay=ay),
                         allow_shortcuts=True, pull_strings=True, use_clearance=False
                     )
@@ -275,12 +292,12 @@ class TraverseWaypointsDroneController(DroneController):
                     # noinspection PyUnboundLocalVariable
                     print(f"Path Planning: {end - start}s")
 
-            # Otherwise, if a path already exists, update it based on the agent's current position.
+            # Otherwise, if there is an existing path, update it based on the agent's current position.
             elif path is not None:
                 if self.__debug:
                     start = timer()
 
-                new_path: Optional[Path] = self.__planner.update_path(
+                new_path = self.__planner.update_path(
                     current_pos, path, debug=self.__debug,
                     d=PlanningToolkit.l1_distance(ay=ay), h=PlanningToolkit.l1_distance(ay=ay),
                     allow_shortcuts=True, pull_strings=True, use_clearance=True,
@@ -295,11 +312,23 @@ class TraverseWaypointsDroneController(DroneController):
                         nearest_waypoint_tolerance=0.025
                     )
 
-                path = new_path
-
                 if self.__debug:
                     end = timer()
                     print(f"Path Updating: {end - start}s")
+
+            with self.__planning_lock:
+                if appending_waypoints:
+                    if new_path is not None:
+                        if self.__path is not None:
+                            path = new_path.replace_before(0, self.__path, keep_last=False)
+                        else:
+                            path = new_path
+                            path.positions[0] = current_pos
+                else:
+                    path = new_path
+
+                self.__new_waypoint_count -= new_waypoint_count
+                self.__path = path
 
             # Perform curve fitting and interpolation on any path found.
             if path is not None:
@@ -316,9 +345,7 @@ class TraverseWaypointsDroneController(DroneController):
             # by other threads.
             with self.__planning_lock:
                 self.__interpolated_path = interpolated_path
-                self.__path = path
                 self.__planning_is_needed = False
-                self.__waypoints_changed = False
 
             # Wait for 10ms before performing any further path planning, so as to avoid a spin loop.
             time.sleep(0.01)
