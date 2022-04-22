@@ -44,19 +44,18 @@ class TraverseWaypointsDroneController(DroneController):
         self.__alive: bool = False
 
         self.__ay: float = 10
-        self.__current_path: Optional[Path] = None
         self.__debug: bool = debug
         self.__drone: Drone = drone
         self.__flight_allowed: bool = True
         self.__planning_octree: OcTree = planning_octree
         self.__should_terminate: threading.Event = threading.Event()
 
-        # The path planning variables, together with their lock.
+        # The shared variables, together with their lock.
         self.__current_pos: Optional[np.ndarray] = None
+        self.__lock: threading.Lock = threading.Lock()
         self.__new_path_available: bool = False
         self.__new_waypoint_count: int = 0
-        self.__planning_lock: threading.Lock = threading.Lock()
-        self.__planning_path: Optional[Path] = None
+        self.__path: Optional[Path] = None
         self.__waypoints: List[np.ndarray] = []
 
         # Construct the planning toolkit.
@@ -71,7 +70,7 @@ class TraverseWaypointsDroneController(DroneController):
 
         # Set up the path planning thread and its associated variables.
         self.__planning_is_needed: bool = False
-        self.__planning_needed: threading.Condition = threading.Condition(self.__planning_lock)
+        self.__planning_needed: threading.Condition = threading.Condition(self.__lock)
         self.__planning_thread: threading.Thread = threading.Thread(target=self.__run_planning)
 
         # Start the path planning thread.
@@ -87,17 +86,17 @@ class TraverseWaypointsDroneController(DroneController):
 
         :param new_waypoints:   The new waypoints to append.
         """
-        with self.__planning_lock:
+        with self.__lock:
             self.__waypoints += new_waypoints
             self.__new_waypoint_count += len(new_waypoints)
-
-    def get_current_path(self) -> Optional[Path]:
-        """Get a copy of the current path (if any), or None otherwise."""
-        return self.__current_path.copy() if self.__current_path is not None else None
 
     def get_occupancy_colourer(self) -> Callable[[np.ndarray], np.ndarray]:
         """Get a function that can be used to colour waypoints on a path based on their occupancy status."""
         return self.__planning_toolkit.occupancy_colourer()
+
+    def get_path(self) -> Optional[Path]:
+        """Get a copy of the path (if any), or None otherwise."""
+        return self.__path.copy() if self.__path is not None else None
 
     def get_planning_toolkit(self) -> PlanningToolkit:
         """TODO"""
@@ -134,114 +133,96 @@ class TraverseWaypointsDroneController(DroneController):
                 if event.key == pygame.K_SPACE:
                     self.__flight_allowed = not self.__flight_allowed
 
-        # Extract the current position of the drone from the tracker pose provided.
-        tracker_i_t_c: np.ndarray = np.linalg.inv(tracker_c_t_i)
-        current_pos: np.ndarray = tracker_i_t_c[0:3, 3]
+        with self.__lock:
+            # Extract the current position of the drone from the tracker pose provided.
+            tracker_i_t_c: np.ndarray = np.linalg.inv(tracker_c_t_i)
+            self.__current_pos: np.ndarray = tracker_i_t_c[0:3, 3].copy()
 
-        # If we're able to acquire the planning lock:
-        acquired: bool = self.__planning_lock.acquire(blocking=False)
-        if acquired:
-            try:
-                # If there's a new path available from the path planner, update the current path and reset the flag.
-                if self.__new_path_available:
-                    self.__current_path = self.__planning_path.copy() if self.__planning_path is not None else None
-                    self.__new_path_available = False
+            # If there are any waypoints through which a path has not yet been planned, tell the path planner
+            # that some path planning is needed.
+            if self.__new_waypoint_count > 0:
+                self.__planning_is_needed = True
+                self.__planning_needed.notify()
 
-                # Otherwise, update the path planner's view of the current path.
-                else:
-                    self.__planning_path = self.__current_path.copy() if self.__current_path is not None else None
+            # If there's a current path, update it based on the drone's current position.
+            if self.__path is not None:
+                if self.__debug:
+                    start = timer()
 
-                # Provide the path planner with the current position of the drone.
-                self.__current_pos = current_pos.copy()
-
-                # If there are any waypoints through which a path has not yet been planned, tell the path planner
-                # that some path planning is needed.
-                if self.__new_waypoint_count > 0:
-                    self.__planning_is_needed = True
-                    self.__planning_needed.notify()
-
-                # Check whether the drone has reached the first waypoint (if any), and remove it from the list if so.
-                # FIXME: Stop hard-coding the threshold here.
-                if len(self.__waypoints) > 0 and np.linalg.norm(current_pos - self.__waypoints[0]) < 0.025:
-                    self.__waypoints = self.__waypoints[1:]
-            finally:
-                # Make sure that the planning lock is released before carrying on.
-                self.__planning_lock.release()
-
-        # If there's a current path, update it based on the drone's current position.
-        if self.__current_path is not None:
-            if self.__debug:
-                start = timer()
-
-            new_path = self.__planner.update_path(
-                current_pos, self.__current_path, debug=self.__debug,
-                d=PlanningToolkit.l1_distance(ay=self.__ay), h=PlanningToolkit.l1_distance(ay=self.__ay),
-                allow_shortcuts=True, pull_strings=True, use_clearance=True,
-                nearest_waypoint_tolerance=0.025
-            )
-
-            if new_path is None:
                 new_path = self.__planner.update_path(
-                    current_pos, self.__current_path, debug=self.__debug,
+                    self.__current_pos, self.__path, debug=self.__debug,
                     d=PlanningToolkit.l1_distance(ay=self.__ay), h=PlanningToolkit.l1_distance(ay=self.__ay),
-                    allow_shortcuts=True, pull_strings=True, use_clearance=False,
+                    allow_shortcuts=True, pull_strings=True, use_clearance=True,
                     nearest_waypoint_tolerance=0.025
                 )
 
-            self.__current_path = new_path
+                if new_path is None:
+                    new_path = self.__planner.update_path(
+                        self.__current_pos, self.__path, debug=self.__debug,
+                        d=PlanningToolkit.l1_distance(ay=self.__ay), h=PlanningToolkit.l1_distance(ay=self.__ay),
+                        allow_shortcuts=True, pull_strings=True, use_clearance=False,
+                        nearest_waypoint_tolerance=0.025
+                    )
 
-            if self.__debug:
-                end = timer()
-                # noinspection PyUnboundLocalVariable
-                print(f"Path Updating: {end - start}s")
+                self.__path = new_path
 
-        # A flag indicating whether or not the drone should stop moving.
-        stop_drone: bool = True
+                if self.__debug:
+                    end = timer()
+                    # noinspection PyUnboundLocalVariable
+                    print(f"Path Updating: {end - start}s")
 
-        # If there's still a current path, try to follow it.
-        if self.__current_path is not None:
-            cam: SimpleCamera = CameraPoseConverter.pose_to_camera(tracker_c_t_i)
-            offset: np.ndarray = self.__current_path[1].position - current_pos
-            offset_length: float = np.linalg.norm(offset)
-            if offset_length >= 1e-4:
-                stop_drone = False
+            # Check whether the drone has reached the first waypoint (if any), and remove it from the list if so.
+            # FIXME: Stop hard-coding the threshold here.
+            if len(self.__waypoints) > 0 and np.linalg.norm(self.__current_pos - self.__waypoints[0]) < 0.025:
+                self.__waypoints = self.__waypoints[1:]
 
-                current_n: np.ndarray = vg.normalize(np.array([cam.n()[0], 0, cam.n()[2]]))
-                target_n: np.ndarray = vg.normalize(np.array([offset[0], 0, offset[2]]))
-                cp: np.ndarray = np.cross(current_n, target_n)
-                sign: int = 1 if np.dot(cp, np.array([0, -1, 0])) >= 0 else -1
-                angle: float = 0.0
-                import warnings
-                with warnings.catch_warnings():
-                    warnings.filterwarnings("error")
-                    try:
-                        angle = sign * np.arccos(np.clip(np.dot(current_n, target_n), -1.0, 1.0))
-                    except RuntimeWarning:
-                        print(current_n, target_n, np.dot(current_n, target_n))
-                turn_rate: float = np.clip(-angle / (np.pi / 2), -1.0, 1.0) if offset_length >= 0.1 else 0.0
-                normalized_offset: np.ndarray = offset / offset_length
-                speed: float = 0.5
-                forward_rate: float = vg.scalar_projection(normalized_offset, cam.n()) * speed
-                right_rate: float = vg.scalar_projection(normalized_offset, -cam.u()) * speed
-                up_rate: float = vg.scalar_projection(normalized_offset, cam.v()) * speed
+            # A flag indicating whether or not the drone should stop moving.
+            stop_drone: bool = True
 
-                if self.__flight_allowed:
-                    self.__drone.turn(turn_rate)
-                else:
-                    self.__drone.turn(0.0)
+            # If there's still a current path, try to follow it.
+            if self.__path is not None:
+                cam: SimpleCamera = CameraPoseConverter.pose_to_camera(tracker_c_t_i)
+                offset: np.ndarray = self.__path[1].position - self.__current_pos
+                offset_length: float = np.linalg.norm(offset)
+                if offset_length >= 1e-4:
+                    stop_drone = False
 
-                if self.__flight_allowed and (angle * 180 / np.pi <= 90.0 or turn_rate == 0.0):
-                    self.__drone.move_forward(forward_rate)
-                    self.__drone.move_right(right_rate)
-                    self.__drone.move_up(up_rate)
-                else:
-                    self.__drone.move_forward(0.0)
-                    self.__drone.move_right(0.0)
-                    self.__drone.move_up(0.0)
+                    current_n: np.ndarray = vg.normalize(np.array([cam.n()[0], 0, cam.n()[2]]))
+                    target_n: np.ndarray = vg.normalize(np.array([offset[0], 0, offset[2]]))
+                    cp: np.ndarray = np.cross(current_n, target_n)
+                    sign: int = 1 if np.dot(cp, np.array([0, -1, 0])) >= 0 else -1
+                    angle: float = 0.0
+                    import warnings
+                    with warnings.catch_warnings():
+                        warnings.filterwarnings("error")
+                        try:
+                            angle = sign * np.arccos(np.clip(np.dot(current_n, target_n), -1.0, 1.0))
+                        except RuntimeWarning:
+                            print(current_n, target_n, np.dot(current_n, target_n))
+                    turn_rate: float = np.clip(-angle / (np.pi / 2), -1.0, 1.0) if offset_length >= 0.1 else 0.0
+                    normalized_offset: np.ndarray = offset / offset_length
+                    speed: float = 0.5
+                    forward_rate: float = vg.scalar_projection(normalized_offset, cam.n()) * speed
+                    right_rate: float = vg.scalar_projection(normalized_offset, -cam.u()) * speed
+                    up_rate: float = vg.scalar_projection(normalized_offset, cam.v()) * speed
 
-        # If the drone should stop moving, stop it.
-        if stop_drone:
-            self.__drone.stop()
+                    if self.__flight_allowed:
+                        self.__drone.turn(turn_rate)
+                    else:
+                        self.__drone.turn(0.0)
+
+                    if self.__flight_allowed and (angle * 180 / np.pi <= 90.0 or turn_rate == 0.0):
+                        self.__drone.move_forward(forward_rate)
+                        self.__drone.move_right(right_rate)
+                        self.__drone.move_up(up_rate)
+                    else:
+                        self.__drone.move_forward(0.0)
+                        self.__drone.move_right(0.0)
+                        self.__drone.move_up(0.0)
+
+            # If the drone should stop moving, stop it.
+            if stop_drone:
+                self.__drone.stop()
 
     def set_waypoints(self, waypoints: List[np.ndarray]) -> None:
         """
@@ -249,7 +230,7 @@ class TraverseWaypointsDroneController(DroneController):
 
         :param waypoints:   The waypoints that the drone should traverse.
         """
-        with self.__planning_lock:
+        with self.__lock:
             self.__waypoints = waypoints.copy()
             self.__new_waypoint_count = len(waypoints)
 
@@ -273,7 +254,7 @@ class TraverseWaypointsDroneController(DroneController):
         while not self.__should_terminate.is_set():
             # Wait until path planning is required, and then capture the shared variables locally so that we
             # can use them without having to hold on to the lock.
-            with self.__planning_lock:
+            with self.__lock:
                 while not self.__planning_is_needed:
                     self.__planning_needed.wait(0.1)
                     if self.__should_terminate.is_set():
@@ -314,20 +295,20 @@ class TraverseWaypointsDroneController(DroneController):
                 print(f"Path Planning: {end - start}s")
 
             # Update the shared path variables so that the new path can be picked up by other threads.
-            with self.__planning_lock:
+            with self.__lock:
                 # If we're appending waypoints to the existing path, append the planned sub-path to what's left of
                 # the current path.
                 if appending_waypoints:
                     if new_path is not None:
-                        if self.__planning_path is not None:
-                            self.__planning_path = new_path.replace_before(0, self.__planning_path, keep_last=False)
+                        if self.__path is not None:
+                            self.__path = new_path.replace_before(0, self.__path, keep_last=False)
                         else:
-                            self.__planning_path = new_path
-                            self.__planning_path.positions[0] = current_pos
+                            self.__path = new_path
+                            self.__path.positions[0] = current_pos
 
                 # Otherwise, simply replace the existing path.
                 else:
-                    self.__planning_path = new_path
+                    self.__path = new_path
 
                 self.__new_path_available = True
                 self.__new_waypoint_count -= new_waypoint_count
