@@ -218,21 +218,19 @@ class TraverseWaypointsDroneController(DroneController):
                         angle = sign * np.arccos(np.clip(np.dot(current_n, target_n), -1.0, 1.0))
                     except RuntimeWarning:
                         print(current_n, target_n, np.dot(current_n, target_n))
-                turn_rate: float = np.clip(-angle / (np.pi / 2), -1.0, 1.0)
+                turn_rate: float = np.clip(-angle / (np.pi / 2), -1.0, 1.0) if offset_length >= 0.1 else 0.0
                 normalized_offset: np.ndarray = offset / offset_length
                 speed: float = 0.5
                 forward_rate: float = vg.scalar_projection(normalized_offset, cam.n()) * speed
                 right_rate: float = vg.scalar_projection(normalized_offset, -cam.u()) * speed
                 up_rate: float = vg.scalar_projection(normalized_offset, cam.v()) * speed
 
-                # if pygame.key.get_pressed()[pygame.K_c]:
                 if self.__flight_allowed:
                     self.__drone.turn(turn_rate)
                 else:
                     self.__drone.turn(0.0)
 
-                # if pygame.key.get_pressed()[pygame.K_c] and angle * 180 / np.pi <= 90.0:
-                if self.__flight_allowed and angle * 180 / np.pi <= 90.0:
+                if self.__flight_allowed and (angle * 180 / np.pi <= 90.0 or turn_rate == 0.0):
                     self.__drone.move_forward(forward_rate)
                     self.__drone.move_right(right_rate)
                     self.__drone.move_up(up_rate)
