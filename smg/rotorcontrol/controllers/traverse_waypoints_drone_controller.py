@@ -46,14 +46,14 @@ class TraverseWaypointsDroneController(DroneController):
         self.__ay: float = 10
         self.__debug: bool = debug
         self.__drone: Drone = drone
-        self.__flight_allowed: bool = True
+        self.__movement_allowed: bool = True
         self.__planning_octree: OcTree = planning_octree
         self.__should_terminate: threading.Event = threading.Event()
+        self.__waypoint_capture_range: float = 0.025
 
         # The shared variables, together with their lock.
         self.__current_pos: Optional[np.ndarray] = None
         self.__lock: threading.Lock = threading.Lock()
-        self.__new_path_available: bool = False
         self.__new_waypoint_count: int = 0
         self.__path: Optional[Path] = None
         self.__waypoints: List[np.ndarray] = []
@@ -99,7 +99,7 @@ class TraverseWaypointsDroneController(DroneController):
         return self.__path.copy() if self.__path is not None else None
 
     def get_planning_toolkit(self) -> PlanningToolkit:
-        """TODO"""
+        """Get the planning toolkit that is being used."""
         return self.__planning_toolkit
 
     def iterate(self, *, altitude: Optional[float] = None, events: Optional[List[pygame.event.Event]] = None,
@@ -109,8 +109,9 @@ class TraverseWaypointsDroneController(DroneController):
         Run an iteration of the controller.
 
         .. note::
-            This controller (i) requires the tracker poses to be passed in, and (ii) requires that they be metric.
-            We explicitly check (i). We can't check (ii), so client code is responsible for correct use.
+            This controller (i) requires the tracker poses to be passed in, and (ii) requires that they be
+            scale-correct. We explicitly check (i). We can't check (ii), so client code is responsible for
+            correct use.
 
         :param altitude:            The most recent altitude (in m) for the drone, as measured by any height sensor
                                     it is carrying (optional).
@@ -126,17 +127,21 @@ class TraverseWaypointsDroneController(DroneController):
         if tracker_c_t_i is None:
             raise RuntimeError("Tracker poses must be provided when using 'traverse waypoints' control")
 
+        # --- Step 1: Process Events --- #
+
         # Process any PyGame events that have happened since the last iteration.
         for event in events:
             if event.type == pygame.KEYDOWN:
-                # If the user presses the 'space' key, toggle whether flight is allowed.
+                # If the user presses the 'space' key, toggle whether the drone is allowed to move.
                 if event.key == pygame.K_SPACE:
-                    self.__flight_allowed = not self.__flight_allowed
+                    self.__movement_allowed = not self.__movement_allowed
 
         with self.__lock:
             # Extract the current position of the drone from the tracker pose provided.
             tracker_i_t_c: np.ndarray = np.linalg.inv(tracker_c_t_i)
             self.__current_pos: np.ndarray = tracker_i_t_c[0:3, 3].copy()
+
+            # --- Step 2: Trigger Path Planning (if required) ---#
 
             # If there are any waypoints through which a path has not yet been planned, tell the path planner
             # that some path planning is needed.
@@ -144,81 +149,93 @@ class TraverseWaypointsDroneController(DroneController):
                 self.__planning_is_needed = True
                 self.__planning_needed.notify()
 
+            # --- Step 3: Update Current Path --- #
+
             # If there's a current path, update it based on the drone's current position.
             if self.__path is not None:
                 if self.__debug:
                     start = timer()
 
+                # First try to update the path whilst maintaining sufficient clearance.
                 new_path = self.__planner.update_path(
                     self.__current_pos, self.__path, debug=self.__debug,
                     d=PlanningToolkit.l1_distance(ay=self.__ay), h=PlanningToolkit.l1_distance(ay=self.__ay),
                     allow_shortcuts=True, pull_strings=True, use_clearance=True,
-                    nearest_waypoint_tolerance=0.025
+                    waypoint_capture_range=self.__waypoint_capture_range
                 )
 
+                # If that doesn't work, fall back to updating the path without requiring sufficient clearance,
+                # on the basis that it will probably work in any case.
                 if new_path is None:
                     new_path = self.__planner.update_path(
                         self.__current_pos, self.__path, debug=self.__debug,
                         d=PlanningToolkit.l1_distance(ay=self.__ay), h=PlanningToolkit.l1_distance(ay=self.__ay),
                         allow_shortcuts=True, pull_strings=True, use_clearance=False,
-                        nearest_waypoint_tolerance=0.025
+                        waypoint_capture_range=self.__waypoint_capture_range
                     )
 
                 self.__path = new_path
+
+                # Check whether the drone has reached the first essential waypoint (if any), and remove it if so.
+                next_waypoint_distance: float = np.linalg.norm(self.__current_pos - self.__waypoints[0])
+                if len(self.__waypoints) > 0 and next_waypoint_distance <= self.__waypoint_capture_range:
+                    self.__waypoints = self.__waypoints[1:]
 
                 if self.__debug:
                     end = timer()
                     # noinspection PyUnboundLocalVariable
                     print(f"Path Updating: {end - start}s")
 
-            # Check whether the drone has reached the first waypoint (if any), and remove it from the list if so.
-            # FIXME: Stop hard-coding the threshold here.
-            if len(self.__waypoints) > 0 and np.linalg.norm(self.__current_pos - self.__waypoints[0]) < 0.025:
-                self.__waypoints = self.__waypoints[1:]
+            # --- Step 4: Make Drone Follow Current Path --- #
 
-            # A flag indicating whether or not the drone should stop moving.
+            # A flag indicating whether or not the drone should stop moving. This will be set to False if any reason
+            # is found for the drone to continue moving.
             stop_drone: bool = True
 
             # If there's still a current path, try to follow it.
             if self.__path is not None:
-                cam: SimpleCamera = CameraPoseConverter.pose_to_camera(tracker_c_t_i)
+                # First compute a vector from the drone's current position to the next waypoint on the path.
                 offset: np.ndarray = self.__path[1].position - self.__current_pos
+
+                # Provided we're far enough from the next waypoint for the vector towards it to be normalised:
                 offset_length: float = np.linalg.norm(offset)
                 if offset_length >= 1e-4:
-                    stop_drone = False
-
+                    # Determine the current orientation of the drone in the horizontal plane.
+                    cam: SimpleCamera = CameraPoseConverter.pose_to_camera(tracker_c_t_i)
                     current_n: np.ndarray = vg.normalize(np.array([cam.n()[0], 0, cam.n()[2]]))
+
+                    # Determine the target orientation of the drone in the horizontal plane.
                     target_n: np.ndarray = vg.normalize(np.array([offset[0], 0, offset[2]]))
+
+                    # Determine whether the drone needs to turn left or right to achieve the target orientation.
                     cp: np.ndarray = np.cross(current_n, target_n)
                     sign: int = 1 if np.dot(cp, np.array([0, -1, 0])) >= 0 else -1
-                    angle: float = 0.0
-                    import warnings
-                    with warnings.catch_warnings():
-                        warnings.filterwarnings("error")
-                        try:
-                            angle = sign * np.arccos(np.clip(np.dot(current_n, target_n), -1.0, 1.0))
-                        except RuntimeWarning:
-                            print(current_n, target_n, np.dot(current_n, target_n))
+
+                    # Determine the angle by which the drone needs to turn to achieve the target orientation.
+                    angle: float = sign * np.arccos(np.clip(np.dot(current_n, target_n), -1.0, 1.0))
+
+                    # Determine an appropriate turn rate for the drone.
                     turn_rate: float = np.clip(-angle / (np.pi / 2), -1.0, 1.0) if offset_length >= 0.1 else 0.0
-                    normalized_offset: np.ndarray = offset / offset_length
+
+                    # Determine the linear rates at which the drone should move in each of the three axes.
                     speed: float = 0.5
+                    normalized_offset: np.ndarray = offset / offset_length
                     forward_rate: float = vg.scalar_projection(normalized_offset, cam.n()) * speed
                     right_rate: float = vg.scalar_projection(normalized_offset, -cam.u()) * speed
                     up_rate: float = vg.scalar_projection(normalized_offset, cam.v()) * speed
 
-                    if self.__flight_allowed:
+                    # If the drone is allowed to move right now:
+                    if self.__movement_allowed:
+                        # Set the drone's rates accordingly.
                         self.__drone.turn(turn_rate)
-                    else:
-                        self.__drone.turn(0.0)
+                        if angle * 180 / np.pi <= 90.0 or turn_rate == 0.0:
+                            self.__drone.move_forward(forward_rate)
+                            self.__drone.move_right(right_rate)
+                            self.__drone.move_up(up_rate)
 
-                    if self.__flight_allowed and (angle * 180 / np.pi <= 90.0 or turn_rate == 0.0):
-                        self.__drone.move_forward(forward_rate)
-                        self.__drone.move_right(right_rate)
-                        self.__drone.move_up(up_rate)
-                    else:
-                        self.__drone.move_forward(0.0)
-                        self.__drone.move_right(0.0)
-                        self.__drone.move_up(0.0)
+                        # Also set the flag that will cause the drone to be stopped to False, since we clearly want
+                        # the drone to move.
+                        stop_drone = False
 
             # If the drone should stop moving, stop it.
             if stop_drone:
@@ -310,7 +327,6 @@ class TraverseWaypointsDroneController(DroneController):
                 else:
                     self.__path = new_path
 
-                self.__new_path_available = True
                 self.__new_waypoint_count -= new_waypoint_count
                 self.__planning_is_needed = False
 
