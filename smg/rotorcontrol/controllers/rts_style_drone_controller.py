@@ -22,18 +22,16 @@ class RTSStyleDroneController(DroneController):
 
     # CONSTRUCTOR
 
-    def __init__(self, *, debug: bool = False, drone: Drone, intrinsics: Tuple[float, float, float, float],
-                 planning_octree: OcTree, scene_octree: OcTree, viewing_camera: Camera, window_size: Tuple[int, int]):
+    def __init__(self, *, debug: bool = False, drone: Drone, picker: OctomapPicker,
+                 planning_octree: OcTree, viewing_camera: Camera):
         """
         Construct an RTS-style flight controller for a drone.
 
         :param debug:           Whether to enable debugging.
         :param drone:           The drone.
-        :param intrinsics:      The intrinsics of the virtual camera being used to view the scene.
+        :param picker:          A picker for the scene octree.
         :param planning_octree: The planning octree (used for path planning).
-        :param scene_octree:    The scene octree (used for picking).
         :param viewing_camera:  The virtual camera being used to view the scene.
-        :param window_size:     The size of the window being used to view the scene.
         """
         self.__goal_pos: Optional[np.ndarray] = None
         self.__height_offset: float = 0.5
@@ -41,7 +39,7 @@ class RTSStyleDroneController(DroneController):
             debug=debug, drone=drone, planning_octree=planning_octree
         )
         # noinspection PyTypeChecker
-        self.__picker: OctomapPicker = OctomapPicker(scene_octree, *window_size, intrinsics)
+        self.__picker: OctomapPicker = picker
         self.__picker_pos: Optional[np.ndarray] = None
         self.__viewing_camera: Camera = viewing_camera
 
