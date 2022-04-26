@@ -30,16 +30,13 @@ class TraverseWaypointsDroneController(DroneController):
 
     # CONSTRUCTOR
 
-    def __init__(self, *, debug: bool = False, drone: Drone, planning_octree: OcTree):
+    def __init__(self, *, debug: bool = False, drone: Drone, planning_toolkit: PlanningToolkit):
         """
         Construct a flight controller for a drone that tries to traverse a specified set of waypoints.
 
-        .. note::
-            The planning octree is not thread-safe and *must not* be used by multiple drone controllers at once.
-
-        :param debug:           Whether to enable debugging.
-        :param drone:           The drone.
-        :param planning_octree: The planning octree (used for path planning).
+        :param debug:               Whether to enable debugging.
+        :param drone:               The drone.
+        :param planning_toolkit:    The planning toolkit (used for path planning).
         """
         self.__alive: bool = False
 
@@ -47,7 +44,7 @@ class TraverseWaypointsDroneController(DroneController):
         self.__debug: bool = debug
         self.__drone: Drone = drone
         self.__movement_allowed: bool = True
-        self.__planning_octree: OcTree = planning_octree
+        self.__planning_toolkit: PlanningToolkit = planning_toolkit
         self.__should_terminate: threading.Event = threading.Event()
         self.__waypoint_capture_range: float = 0.025
 
@@ -57,13 +54,6 @@ class TraverseWaypointsDroneController(DroneController):
         self.__new_waypoint_count: int = 0
         self.__path: Optional[Path] = None
         self.__waypoints: List[np.ndarray] = []
-
-        # Construct the planning toolkit.
-        self.__planning_toolkit = PlanningToolkit(
-            self.__planning_octree,
-            neighbours=PlanningToolkit.neighbours6,
-            node_is_free=lambda n: self.__planning_toolkit.occupancy_status(n) != OCS_OCCUPIED
-        )
 
         # Construct the path planner.
         self.__planner: AStarPathPlanner = AStarPathPlanner(self.__planning_toolkit, debug=False)
