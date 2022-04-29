@@ -8,7 +8,7 @@ from typing import Any, cast, Dict
 
 from smg.navigation import Path, PathNode, PlanningToolkit
 from smg.opengl import OpenGLUtil
-from smg.pyoctomap import OctomapPicker, OcTree
+from smg.pyoctomap import OctomapPicker
 from smg.rigging.cameras import Camera
 from smg.rigging.helpers import CameraPoseConverter
 from smg.rotory.drones import Drone

@@ -11,8 +11,7 @@ import vg
 from timeit import default_timer as timer
 from typing import Callable, List, Optional, Tuple
 
-from smg.navigation import AStarPathPlanner, OCS_OCCUPIED, Path, PlanningToolkit
-from smg.pyoctomap import OcTree
+from smg.navigation import AStarPathPlanner, Path, PlanningToolkit
 from smg.rigging.cameras import SimpleCamera
 from smg.rigging.helpers import CameraPoseConverter
 from smg.rotory.drones import Drone
