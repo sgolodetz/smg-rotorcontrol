@@ -52,6 +52,7 @@ class TraverseWaypointsDroneController(DroneController):
         self.__lock: threading.Lock = threading.Lock()
         self.__new_waypoint_count: int = 0
         self.__path: Optional[Path] = None
+        self.__stop_planning: Optional[threading.Event] = None
         self.__waypoints: List[np.ndarray] = []
 
         # Construct the path planner.
@@ -255,6 +256,10 @@ class TraverseWaypointsDroneController(DroneController):
             self.__waypoints = waypoints.copy()
             self.__new_waypoint_count = len(waypoints)
 
+            # TODO
+            if self.__stop_planning is not None:
+                self.__stop_planning.set()
+
     def terminate(self) -> None:
         """Destroy the controller."""
         if self.__alive:
@@ -273,17 +278,21 @@ class TraverseWaypointsDroneController(DroneController):
         """Run the path planning thread."""
         # Until the drone controller should terminate:
         while not self.__should_terminate.is_set():
-            # Wait until path planning is required, and then capture the shared variables locally so that we
-            # can use them without having to hold on to the lock.
+            # Wait until path planning is required:
             with self.__lock:
                 while not self.__planning_is_needed:
                     self.__planning_needed.wait(0.1)
                     if self.__should_terminate.is_set():
                         return
 
+                # Capture the shared variables locally so that we can use them without having to hold on to the lock.
                 current_pos: Optional[np.ndarray] = self.__current_pos.copy()
                 new_waypoint_count: int = self.__new_waypoint_count
                 waypoints: List[np.ndarray] = self.__waypoints.copy()
+
+                # Construct a new threading event that can be used to stop planning if necessary.
+                stop_planning: threading.Event = threading.Event()
+                self.__stop_planning = stop_planning
 
             # Determine whether we're appending to the path or replacing it, and set the waypoints for which
             # to perform path planning accordingly.
@@ -302,14 +311,14 @@ class TraverseWaypointsDroneController(DroneController):
             new_path: Optional[Path] = self.__planner.plan_multi_step_path(
                 waypoints_to_plan,
                 d=PlanningToolkit.l1_distance(ay=self.__ay), h=PlanningToolkit.l1_distance(ay=self.__ay),
-                allow_shortcuts=True, pull_strings=True, use_clearance=True
+                allow_shortcuts=True, pull_strings=True, use_clearance=True, stop_planning=stop_planning
             )
 
             if new_path is None:
                 new_path = self.__planner.plan_multi_step_path(
                     waypoints_to_plan,
                     d=PlanningToolkit.l1_distance(ay=self.__ay), h=PlanningToolkit.l1_distance(ay=self.__ay),
-                    allow_shortcuts=True, pull_strings=True, use_clearance=False
+                    allow_shortcuts=True, pull_strings=True, use_clearance=False, stop_planning=stop_planning
                 )
 
             if self.__debug:
@@ -319,34 +328,38 @@ class TraverseWaypointsDroneController(DroneController):
 
             # Update the shared variables so that the new path can be picked up by other threads.
             with self.__lock:
-                # If we're appending waypoints to the existing path, append the planned sub-path to what's left of
-                # the current path.
-                if appending_waypoints:
-                    # If we successfully planned a sub-path to append to the existing path:
-                    if new_path is not None:
-                        # If the existing path still exists (bearing in mind that the drone's been flying along it
-                        # whilst we've been planning the sub-path to append):
-                        if self.__path is not None:
-                            # Prepend what's left of the existing path to the planned sub-path.
-                            self.__path = new_path.replace_before(0, self.__path, keep_last=False)
+                if not self.__stop_planning.is_set():
+                    # If we're appending waypoints to the existing path, append the planned sub-path to what's left of
+                    # the current path.
+                    if appending_waypoints:
+                        # If we successfully planned a sub-path to append to the existing path:
+                        if new_path is not None:
+                            # If the existing path still exists (bearing in mind that the drone's been flying along it
+                            # whilst we've been planning the sub-path to append):
+                            if self.__path is not None:
+                                # Prepend what's left of the existing path to the planned sub-path.
+                                self.__path = new_path.replace_before(0, self.__path, keep_last=False)
 
-                        # Otherwise:
-                        else:
-                            # Replace the existing path, updating its starting waypoint to match the current position
-                            # of the drone in the process (note that this may not be exactly the same as the goal of
-                            # the original path, since the drone may not have perfectly made it to the goal).
-                            self.__path = new_path
-                            self.__path.positions[0] = self.__current_pos.copy()
+                            # Otherwise:
+                            else:
+                                # Replace the existing path, updating its starting waypoint to match the current position
+                                # of the drone in the process (note that this may not be exactly the same as the goal of
+                                # the original path, since the drone may not have perfectly made it to the goal).
+                                self.__path = new_path
+                                self.__path.positions[0] = self.__current_pos.copy()
 
-                # Otherwise, simply replace the existing path.
-                else:
-                    self.__path = new_path
+                    # Otherwise, simply replace the existing path.
+                    else:
+                        self.__path = new_path
 
-                # Decrease the number of new waypoints for which planned is still required, and reset the flag
-                # indicating that planning is needed. If there are still waypoints outstanding, path planning
-                # will shortly be triggered again by the main thread in any case.
-                self.__new_waypoint_count -= new_waypoint_count
-                self.__planning_is_needed = False
+                    # Decrease the number of new waypoints for which planned is still required, and reset the flag
+                    # indicating that planning is needed. If there are still waypoints outstanding, path planning
+                    # will shortly be triggered again by the main thread in any case.
+                    self.__new_waypoint_count -= new_waypoint_count
+                    self.__planning_is_needed = False
+
+                # TODO
+                self.__stop_planning = None
 
             # Wait for 10ms before performing any further path planning, so as to avoid a spin loop.
             time.sleep(0.01)
