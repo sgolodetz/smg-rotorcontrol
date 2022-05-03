@@ -113,6 +113,26 @@ class RTSStyleDroneController(DroneController):
                 waypoint_colourer=self.__inner_controller.get_occupancy_colourer()
             )
 
+        # TODO
+        glColor3f(1, 1, 0)
+
+        new_waypoints: List[np.ndarray] = self.__inner_controller.get_new_waypoints()
+        waypoints: List[np.ndarray] = self.__inner_controller.get_waypoints()
+        last_waypoint: np.ndarray = self.__inner_controller.get_current_pos()
+        if path is not None and len(new_waypoints) != len(waypoints):
+            last_waypoint = path[-1].position
+
+        glLineWidth(5)
+        for i in range(len(new_waypoints)):
+            OpenGLUtil.render_sphere(new_waypoints[i], 0.1, slices=10, stacks=10)
+            glBegin(GL_LINES)
+            glVertex3f(*last_waypoint)
+            glVertex3f(*new_waypoints[i])
+            glEnd()
+            last_waypoint = new_waypoints[i]
+        glLineWidth(1)
+
+        # TODO
         if self.__goal_pos is not None:
             toolkit: PlanningToolkit = self.__inner_controller.get_planning_toolkit()
             goal_node: PathNode = toolkit.pos_to_node(self.__goal_pos)

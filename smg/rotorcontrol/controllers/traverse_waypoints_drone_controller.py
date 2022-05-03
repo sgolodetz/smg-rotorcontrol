@@ -79,6 +79,16 @@ class TraverseWaypointsDroneController(DroneController):
             self.__waypoints += new_waypoints
             self.__new_waypoint_count += len(new_waypoints)
 
+    def get_current_pos(self) -> Optional[np.ndarray]:
+        """Get the current position of the drone (if available yet), or None otherwise."""
+        with self.__lock:
+            return self.__current_pos.copy() if self.__current_pos is not None else None
+
+    def get_new_waypoints(self) -> List[np.ndarray]:
+        """Get any new (i.e. as yet unplanned) waypoints that the drone should traverse."""
+        with self.__lock:
+            return self.__waypoints[-self.__new_waypoint_count:] if self.__new_waypoint_count > 0 else []
+
     def get_occupancy_colourer(self) -> Callable[[np.ndarray], np.ndarray]:
         """Get a function that can be used to colour waypoints on a path based on their occupancy status."""
         return self.__planning_toolkit.occupancy_colourer()
@@ -90,6 +100,11 @@ class TraverseWaypointsDroneController(DroneController):
     def get_planning_toolkit(self) -> PlanningToolkit:
         """Get the planning toolkit that is being used."""
         return self.__planning_toolkit
+
+    def get_waypoints(self) -> List[np.ndarray]:
+        """Get the waypoints that the drone should traverse."""
+        with self.__lock:
+            return self.__waypoints.copy()
 
     def iterate(self, *, altitude: Optional[float] = None, events: Optional[List[pygame.event.Event]] = None,
                 image: np.ndarray, image_timestamp: Optional[float] = None,
