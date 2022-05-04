@@ -21,7 +21,7 @@ class RTSStyleDroneController(DroneController):
     # CONSTRUCTOR
 
     def __init__(self, *, debug: bool = False, drone: Drone, picker: Optional[OctomapPicker],
-                 planning_toolkit: PlanningToolkit, viewing_camera: Camera):
+                 planning_toolkit: Optional[PlanningToolkit], viewing_camera: Camera):
         """
         Construct an RTS-style flight controller for a drone.
 
@@ -32,12 +32,14 @@ class RTSStyleDroneController(DroneController):
         :param viewing_camera:      The virtual camera being used to view the scene.
         """
         if picker is None:
-            raise RuntimeError("Error: An RTS-style drone controller requires a picker for the scene to be provided")
+            raise RuntimeError("Error: An RTS-style drone controller requires a picker for the scene")
+        if planning_toolkit is None:
+            raise RuntimeError("Error: An RTS-style drone controller requires a planning toolkit for the scene")
 
         self.__goal_pos: Optional[np.ndarray] = None
         self.__height_offset: float = 1.0
         self.__inner_controller: TraverseWaypointsDroneController = TraverseWaypointsDroneController(
-            debug=debug, drone=drone, planning_toolkit=planning_toolkit
+            debug=debug, drone=drone, planning_toolkit=cast(PlanningToolkit, planning_toolkit)
         )
         self.__picker: OctomapPicker = cast(OctomapPicker, picker)
         self.__picker_pos: Optional[np.ndarray] = None
