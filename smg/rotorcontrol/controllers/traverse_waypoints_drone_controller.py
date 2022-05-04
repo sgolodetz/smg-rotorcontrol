@@ -253,12 +253,16 @@ class TraverseWaypointsDroneController(DroneController):
         :param waypoints:   The waypoints that the drone should traverse.
         """
         with self.__lock:
-            self.__waypoints = waypoints.copy()
-            self.__new_waypoint_count = len(waypoints)
+            # Delete the current path (if any).
+            self.__path = None
 
-            # TODO
+            # Stop any ongoing path planning.
             if self.__stop_planning is not None:
                 self.__stop_planning.set()
+
+            # Replace the waypoints, and update the number of new waypoints for which path planning will be needed.
+            self.__waypoints = waypoints.copy()
+            self.__new_waypoint_count = len(waypoints)
 
     def terminate(self) -> None:
         """Destroy the controller."""
