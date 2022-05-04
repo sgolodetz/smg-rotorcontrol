@@ -6,8 +6,9 @@ import pygame
 
 from typing import List, Optional, Sequence, Tuple
 
-from .drone_controller import DroneController
 from smg.rotory.drones import Drone
+
+from .drone_controller import DroneController
 
 
 class KeyboardDroneController(DroneController):

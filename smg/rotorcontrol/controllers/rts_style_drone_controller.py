@@ -1,10 +1,8 @@
-from typing import Optional, List, Tuple
-
 import numpy as np
 import pygame
 
 from OpenGL.GL import *
-from typing import Any, cast, Dict
+from typing import Any, cast, Dict, Optional, List, Tuple
 
 from smg.navigation import Path, PathNode, PlanningToolkit
 from smg.opengl import OpenGLUtil
@@ -37,7 +35,7 @@ class RTSStyleDroneController(DroneController):
             raise RuntimeError("Error: An RTS-style drone controller requires a picker for the scene to be provided")
 
         self.__goal_pos: Optional[np.ndarray] = None
-        self.__height_offset: float = 0.5
+        self.__height_offset: float = 1.0
         self.__inner_controller: TraverseWaypointsDroneController = TraverseWaypointsDroneController(
             debug=debug, drone=drone, planning_toolkit=planning_toolkit
         )
@@ -63,14 +61,23 @@ class RTSStyleDroneController(DroneController):
                                     by any tracker that's running (optional). Note that if the tracker is a monocular
                                     one, the transformation will be non-metric.
         """
-        # TODO
+        # Make a copy of the keyword arguments that have been passed to the method, so that they can later be
+        # forwarded on to the inner controller.
         kwargs: Dict[str, Any] = {key: value for key, value in locals().items() if key != "self"}
 
-        # Pick from the viewing pose.
+        # If no PyGame events were passed in, use an empty list of events as the default.
+        if events is None:
+            events = []
+
+        # Pick from the viewing pose, and try to determine a goal position based on the position of the mouse.
+        # FIXME: This currently assumes that there is a single picking sub-window that's at the top-left of the
+        #        overall window. We should make this more general.
         picking_image, picking_mask = self.__picker.pick(
             np.linalg.inv(CameraPoseConverter.camera_to_pose(self.__viewing_camera))
         )
+
         mx, my = pygame.mouse.get_pos()
+
         # noinspection PyChainedComparisons
         if 0 <= mx < picking_mask.shape[1] and 0 <= my < picking_mask.shape[0] and picking_mask[my, mx] != 0:
             self.__picker_pos = picking_image[my, mx]
@@ -80,32 +87,29 @@ class RTSStyleDroneController(DroneController):
             self.__picker_pos = None
             self.__goal_pos = None
 
-        # If no PyGame events were passed in, use an empty list of events as the default.
-        if events is None:
-            events = []
-
         # Process any PyGame events that have happened since the last iteration.
         for event in events:
-            # TODO
+            # If the user clicks the left mouse button, and a goal position has been determined:
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.__goal_pos is not None:
-                # TODO
+                # If the user is currently pressing the 'left shift' key, append the goal position to the existing
+                # list of waypoints.
                 if pygame.key.get_mods() & pygame.KMOD_SHIFT:
                     self.__inner_controller.append_waypoints([self.__goal_pos])
 
-                # TODO
+                # Otherwise, replace the list of waypoints with a singleton list containing the goal position.
                 else:
                     self.__inner_controller.set_waypoints([self.__goal_pos])
 
-            # TODO
+            # If the user scrolls the mouse wheel, change the desired offset of the goal position above the floor.
             elif event.type == pygame.MOUSEWHEEL:
                 self.__height_offset = np.clip(self.__height_offset + event.y * 0.2, 0.3, 3.0)
 
-        # TODO
+        # Delegate lower-level control of the drone to the inner controller.
         self.__inner_controller.iterate(**kwargs)
 
     def render_ui(self) -> None:
         """Render the user interface for the controller."""
-        # TODO
+        # Render the path that the drone is following (if any).
         path: Optional[Path] = self.__inner_controller.get_path()
         if path is not None:
             path.render(
@@ -113,7 +117,8 @@ class RTSStyleDroneController(DroneController):
                 waypoint_colourer=self.__inner_controller.get_occupancy_colourer()
             )
 
-        # TODO
+        # Render any new waypoints for which a path has not yet been planned.
+        # FIXME: This is currently a bit messy - it needs tidying up and moving somewhere more sensible.
         glColor3f(1, 1, 0)
 
         new_waypoints: List[np.ndarray] = self.__inner_controller.get_new_waypoints()
@@ -132,8 +137,9 @@ class RTSStyleDroneController(DroneController):
             last_waypoint = new_waypoints[i]
         glLineWidth(1)
 
-        # TODO
+        # If a goal position has been determined:
         if self.__goal_pos is not None:
+            # Render a sphere at that position with a colour that indicates the traversability of the goal node.
             toolkit: PlanningToolkit = self.__inner_controller.get_planning_toolkit()
             goal_node: PathNode = toolkit.pos_to_node(self.__goal_pos)
             if toolkit.node_is_traversable(goal_node, use_clearance=True):
@@ -147,6 +153,8 @@ class RTSStyleDroneController(DroneController):
             OpenGLUtil.render_sphere(self.__goal_pos, 0.1, slices=10, stacks=10)
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
 
+            # Render a vertical line from the goal position to the closest point on the ground beneath it.
+            # This makes it easier for the user to see where the goal lies in relation to the scene.
             glLineWidth(5)
             glColor3f(1, 0, 0)
             glBegin(GL_LINES)
