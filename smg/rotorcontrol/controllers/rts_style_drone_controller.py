@@ -43,6 +43,9 @@ class RTSStyleDroneController(DroneController):
         self.__picker_pos: Optional[np.ndarray] = None
         self.__viewing_camera: Camera = viewing_camera
 
+        # FIXME: Remove this once command chaining is supported.
+        drone.takeoff()
+
     # PUBLIC METHODS
 
     def iterate(self, *, altitude: Optional[float] = None, events: Optional[List[pygame.event.Event]] = None,
