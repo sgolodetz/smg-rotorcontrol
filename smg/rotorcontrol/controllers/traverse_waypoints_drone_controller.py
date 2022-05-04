@@ -282,8 +282,8 @@ class TraverseWaypointsDroneController(DroneController):
         """Run the path planning thread."""
         # Until the drone controller should terminate:
         while not self.__should_terminate.is_set():
-            # Wait until path planning is required:
             with self.__lock:
+                # Wait until path planning is required.
                 while not self.__planning_is_needed:
                     self.__planning_needed.wait(0.1)
                     if self.__should_terminate.is_set():
@@ -294,7 +294,7 @@ class TraverseWaypointsDroneController(DroneController):
                 new_waypoint_count: int = self.__new_waypoint_count
                 waypoints: List[np.ndarray] = self.__waypoints.copy()
 
-                # Construct a new threading event that can be used to stop planning if necessary.
+                # Construct a new threading event that can be used to stop path planning if necessary.
                 stop_planning: threading.Event = threading.Event()
                 self.__stop_planning = stop_planning
 
@@ -330,25 +330,27 @@ class TraverseWaypointsDroneController(DroneController):
                 # noinspection PyUnboundLocalVariable
                 print(f"Path Planning: {end - start}s")
 
-            # Update the shared variables so that the new path can be picked up by other threads.
             with self.__lock:
+                # Provided path planning wasn't stopped, update the shared variables so that the new path can be
+                # picked up by other threads.
                 if not self.__stop_planning.is_set():
-                    # If we're appending waypoints to the existing path, append the planned sub-path to what's left of
-                    # the current path.
+                    # If we're appending waypoints to the existing path, append the planned sub-path to what's left
+                    # of the current path.
                     if appending_waypoints:
                         # If we successfully planned a sub-path to append to the existing path:
                         if new_path is not None:
-                            # If the existing path still exists (bearing in mind that the drone's been flying along it
-                            # whilst we've been planning the sub-path to append):
+                            # If the existing path still exists (bearing in mind that the drone's been flying along
+                            # it whilst we've been planning the sub-path to append):
                             if self.__path is not None:
                                 # Prepend what's left of the existing path to the planned sub-path.
                                 self.__path = new_path.replace_before(0, self.__path, keep_last=False)
 
                             # Otherwise:
                             else:
-                                # Replace the existing path, updating its starting waypoint to match the current position
-                                # of the drone in the process (note that this may not be exactly the same as the goal of
-                                # the original path, since the drone may not have perfectly made it to the goal).
+                                # Replace the existing path, updating its starting waypoint to match the current
+                                # position of the drone in the process (note that this may not be exactly the same
+                                # as the goal of the original path, since the drone may not have perfectly made it
+                                # to the goal).
                                 self.__path = new_path
                                 self.__path.positions[0] = self.__current_pos.copy()
 
@@ -362,7 +364,7 @@ class TraverseWaypointsDroneController(DroneController):
                     self.__new_waypoint_count -= new_waypoint_count
                     self.__planning_is_needed = False
 
-                # TODO
+                # Delete the event that was provided to allow path planning to be stopped - it's no longer usable.
                 self.__stop_planning = None
 
             # Wait for 10ms before performing any further path planning, so as to avoid a spin loop.
