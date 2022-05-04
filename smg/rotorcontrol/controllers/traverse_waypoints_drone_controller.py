@@ -2,7 +2,6 @@ import numpy as np
 import os
 
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
-# noinspection PyPackageRequirements
 import pygame
 import threading
 import time
@@ -130,7 +129,7 @@ class TraverseWaypointsDroneController(DroneController):
         """
         # If no tracker pose has been passed in, raise an exception and early out.
         if tracker_c_t_i is None:
-            raise RuntimeError("Tracker poses must be provided when using 'traverse waypoints' control")
+            raise RuntimeError("Error: Tracker poses must be provided when using 'traverse waypoints' control")
 
         # --- Step 1: Process Events --- #
 
