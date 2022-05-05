@@ -100,6 +100,15 @@ class TraverseWaypointsDroneController(DroneController):
         with self.__lock:
             return self.__waypoints.copy()
 
+    def has_finished(self) -> bool:
+        """
+        Get whether or not the controller has finished.
+
+        :return:    True, if the controller has finished, or False otherwise.
+        """
+        with self.__lock:
+            return len(self.__waypoints) == 0
+
     def iterate(self, *, altitude: Optional[float] = None, events: Optional[List[pygame.event.Event]] = None,
                 image: np.ndarray, image_timestamp: Optional[float] = None,
                 intrinsics: Tuple[float, float, float, float], tracker_c_t_i: Optional[np.ndarray] = None) -> None:

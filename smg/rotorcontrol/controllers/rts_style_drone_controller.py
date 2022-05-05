@@ -141,22 +141,22 @@ class RTSStyleDroneController(DroneController):
 
             # If the user clicks the right mouse button:
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+                # If the user is currently pressing one of the control keys, make a landing controller.
+                # Otherwise, make a takeoff controller.
+                if pygame.key.get_mods() & pygame.KMOD_CTRL:
+                    new_controller: DroneController = LandingDroneController(drone=self.__drone)
+                else:
+                    new_controller: DroneController = TakeoffDroneController(drone=self.__drone)
+
                 # If the user is currently pressing one of the shift keys:
                 if pygame.key.get_mods() & pygame.KMOD_SHIFT:
-                    # TODO
-                    pass
+                    # Append the newly constructed controller to the queue of inner controllers.
+                    self.__inner_controllers.append(new_controller)
 
                 # Otherwise, if the user is not currently pressing one of the shift keys:
                 else:
                     # Clear the inner controllers queue.
                     self.__clear_inner_controllers()
-
-                    # If the user is currently pressing one of the control keys, make a landing controller.
-                    # Otherwise, make a takeoff controller.
-                    if pygame.key.get_mods() & pygame.KMOD_CTRL:
-                        new_controller: DroneController = LandingDroneController(drone=self.__drone)
-                    else:
-                        new_controller: DroneController = TakeoffDroneController(drone=self.__drone)
 
                     # Replace the queue of inner controllers with a singleton queue containing only the newly
                     # constructed controller.
