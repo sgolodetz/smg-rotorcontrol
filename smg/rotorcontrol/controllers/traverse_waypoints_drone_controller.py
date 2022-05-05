@@ -270,6 +270,11 @@ class TraverseWaypointsDroneController(DroneController):
             if not self.__should_terminate.is_set():
                 self.__should_terminate.set()
 
+            # Stop any ongoing path planning.
+            with self.__lock:
+                if self.__stop_planning is not None:
+                    self.__stop_planning.set()
+
             # Join any running threads.
             self.__planning_thread.join()
 
