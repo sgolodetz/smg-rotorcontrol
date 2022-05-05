@@ -11,14 +11,14 @@ from smg.rotory.drones import Drone, SimulatedDrone
 from .drone_controller import DroneController
 
 
-class TakeoffDroneController(DroneController):
-    """A flight controller for a drone that tries to make the drone take off."""
+class LandingDroneController(DroneController):
+    """A flight controller for a drone that tries to make the drone land."""
 
     # CONSTRUCTOR
 
     def __init__(self, *, drone: Drone):
         """
-        Construct a takeoff controller for a drone.
+        Construct a landing controller for a drone.
 
         :param drone:   The drone.
         """
@@ -44,8 +44,8 @@ class TakeoffDroneController(DroneController):
         """
         if type(self.__drone) is SimulatedDrone:
             simulated_drone: SimulatedDrone = cast(SimulatedDrone, self.__drone)
-            if simulated_drone.get_state() == SimulatedDrone.IDLE:
-                self.__drone.takeoff()
+            if simulated_drone.get_state() == SimulatedDrone.FLYING:
+                self.__drone.land()
         else:
             # TODO: We still need to make this work for real drones.
             pass
@@ -60,7 +60,7 @@ class TakeoffDroneController(DroneController):
         """
         if type(self.__drone) is SimulatedDrone:
             simulated_drone: SimulatedDrone = cast(SimulatedDrone, self.__drone)
-            return simulated_drone.get_state() == SimulatedDrone.FLYING
+            return simulated_drone.get_state() == SimulatedDrone.IDLE
         else:
             # TODO: We still need to make this work for real drones.
             return False
