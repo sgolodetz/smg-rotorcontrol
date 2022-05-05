@@ -1,8 +1,9 @@
 import numpy as np
 import pygame
 
+from collections import deque
 from OpenGL.GL import *
-from typing import Any, cast, Dict, Optional, List, Tuple
+from typing import Any, cast, Deque, Dict, Optional, List, Tuple
 
 from smg.navigation import PathNode, PlanningToolkit
 from smg.opengl import OpenGLUtil
@@ -36,16 +37,15 @@ class RTSStyleDroneController(DroneController):
         if planning_toolkit is None:
             raise RuntimeError("Error: An RTS-style drone controller requires a planning toolkit for the scene")
 
+        self.__debug: bool = debug
+        self.__drone: Drone = drone
         self.__goal_pos: Optional[np.ndarray] = None
         self.__height_offset: float = 1.0
+        self.__inner_controllers: Deque[DroneController] = deque()
         self.__picker: OctomapPicker = cast(OctomapPicker, picker)
         self.__picker_pos: Optional[np.ndarray] = None
         self.__planning_toolkit: PlanningToolkit = cast(PlanningToolkit, planning_toolkit)
         self.__viewing_camera: Camera = viewing_camera
-
-        self.__inner_controller: TraverseWaypointsDroneController = TraverseWaypointsDroneController(
-            debug=debug, drone=drone, planning_toolkit=self.__planning_toolkit
-        )
 
         # FIXME: Remove this once command chaining is supported.
         drone.takeoff()
@@ -94,30 +94,62 @@ class RTSStyleDroneController(DroneController):
             self.__picker_pos = None
             self.__goal_pos = None
 
+        # Get the active inner controller (if any).
+        active_inner_controller: Optional[DroneController] = self.__get_active_inner_controller()
+
         # Process any PyGame events that have happened since the last iteration.
         for event in events:
             # If the user clicks the left mouse button, and a goal position has been determined:
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.__goal_pos is not None:
-                # If the user is currently pressing the 'left shift' key, append the goal position to the existing
-                # list of waypoints.
-                if pygame.key.get_mods() & pygame.KMOD_SHIFT:
-                    self.__inner_controller.append_waypoints([self.__goal_pos])
-
-                # Otherwise, replace the list of waypoints with a singleton list containing the goal position.
+                # If there is an active traverse waypoints controller, reuse it. Otherwise, construct a new one.
+                traverse_waypoints_controller: Optional[TraverseWaypointsDroneController] = None
+                if type(active_inner_controller) is TraverseWaypointsDroneController:
+                    traverse_waypoints_controller = cast(TraverseWaypointsDroneController, active_inner_controller)
                 else:
-                    self.__inner_controller.set_waypoints([self.__goal_pos])
+                    traverse_waypoints_controller = TraverseWaypointsDroneController(
+                        debug=self.__debug, drone=self.__drone, planning_toolkit=self.__planning_toolkit
+                    )
+
+                # If the user is currently pressing the 'left shift' key:
+                if pygame.key.get_mods() & pygame.KMOD_SHIFT:
+                    # Append the goal position to the traverse waypoint controller's existing list of waypoints.
+                    traverse_waypoints_controller.append_waypoints([self.__goal_pos])
+
+                    # If the active inner controller was not a traverse waypoints controller, append the newly
+                    # constructed controller to the queue of inner controllers.
+                    if type(active_inner_controller) is not TraverseWaypointsDroneController:
+                        self.__inner_controllers.append(traverse_waypoints_controller)
+
+                # Otherwise, if the user is not currently pressing the 'left shift' key:
+                else:
+                    # Replace the traverse waypoint controller's list of waypoints with a singleton list containing
+                    # the goal position.
+                    traverse_waypoints_controller.set_waypoints([self.__goal_pos])
+
+                    # If the active inner controller was not a traverse waypoints controller:
+                    if type(active_inner_controller) is not TraverseWaypointsDroneController:
+                        # Terminate all existing inner controllers.
+                        for inner_controller in self.__inner_controllers:
+                            inner_controller.terminate()
+
+                        # Replace the queue of inner controllers with a singleton queue containing only the newly
+                        # constructed controller, and update the active inner controller.
+                        self.__inner_controllers = deque([traverse_waypoints_controller])
+                        active_inner_controller = traverse_waypoints_controller
 
             # If the user scrolls the mouse wheel, change the desired offset of the goal position above the floor.
             elif event.type == pygame.MOUSEWHEEL:
                 self.__height_offset = np.clip(self.__height_offset + event.y * 0.2, 0.3, 3.0)
 
-        # Delegate lower-level control of the drone to the inner controller.
-        self.__inner_controller.iterate(**kwargs)
+        # Delegate lower-level control of the drone to the active inner controller (if any).
+        if active_inner_controller is not None:
+            active_inner_controller.iterate(**kwargs)
 
     def render_ui(self) -> None:
         """Render the user interface for the controller."""
-        # Render the user interface for the inner controller.
-        self.__inner_controller.render_ui()
+        # Render the user interfaces for the inner controllers.
+        for inner_controller in self.__inner_controllers:
+            inner_controller.render_ui()
 
         # If a goal position has been determined:
         if self.__goal_pos is not None:
@@ -146,4 +178,15 @@ class RTSStyleDroneController(DroneController):
 
     def terminate(self) -> None:
         """Tell the controller to terminate."""
-        self.__inner_controller.terminate()
+        for inner_controller in self.__inner_controllers:
+            inner_controller.terminate()
+
+    # PRIVATE METHODS
+
+    def __get_active_inner_controller(self) -> Optional[DroneController]:
+        """
+        Get the active inner controller (if any).
+
+        :return:    The active inner controller (if any), or None otherwise.
+        """
+        return self.__inner_controllers[0] if len(self.__inner_controllers) > 0 else None
