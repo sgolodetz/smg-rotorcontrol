@@ -95,10 +95,6 @@ class TraverseWaypointsDroneController(DroneController):
         """Get a copy of the path (if any), or None otherwise."""
         return self.__path.copy() if self.__path is not None else None
 
-    def get_planning_toolkit(self) -> PlanningToolkit:
-        """Get the planning toolkit that is being used."""
-        return self.__planning_toolkit
-
     def get_waypoints(self) -> List[np.ndarray]:
         """Get the waypoints that the drone should traverse."""
         with self.__lock:

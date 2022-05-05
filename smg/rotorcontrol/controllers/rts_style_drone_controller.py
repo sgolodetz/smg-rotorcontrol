@@ -38,12 +38,14 @@ class RTSStyleDroneController(DroneController):
 
         self.__goal_pos: Optional[np.ndarray] = None
         self.__height_offset: float = 1.0
-        self.__inner_controller: TraverseWaypointsDroneController = TraverseWaypointsDroneController(
-            debug=debug, drone=drone, planning_toolkit=cast(PlanningToolkit, planning_toolkit)
-        )
         self.__picker: OctomapPicker = cast(OctomapPicker, picker)
         self.__picker_pos: Optional[np.ndarray] = None
+        self.__planning_toolkit: PlanningToolkit = cast(PlanningToolkit, planning_toolkit)
         self.__viewing_camera: Camera = viewing_camera
+
+        self.__inner_controller: TraverseWaypointsDroneController = TraverseWaypointsDroneController(
+            debug=debug, drone=drone, planning_toolkit=self.__planning_toolkit
+        )
 
         # FIXME: Remove this once command chaining is supported.
         drone.takeoff()
@@ -86,7 +88,7 @@ class RTSStyleDroneController(DroneController):
         # noinspection PyChainedComparisons
         if 0 <= mx < picking_mask.shape[1] and 0 <= my < picking_mask.shape[0] and picking_mask[my, mx] != 0:
             self.__picker_pos = picking_image[my, mx]
-            self.__picker_pos = self.__inner_controller.get_planning_toolkit().pos_to_vpos(self.__picker_pos)
+            self.__picker_pos = self.__planning_toolkit.pos_to_vpos(self.__picker_pos)
             self.__goal_pos = self.__picker_pos + np.array([0, -self.__height_offset, 0])
         else:
             self.__picker_pos = None
@@ -120,11 +122,10 @@ class RTSStyleDroneController(DroneController):
         # If a goal position has been determined:
         if self.__goal_pos is not None:
             # Render a sphere at that position with a colour that indicates the traversability of the goal node.
-            toolkit: PlanningToolkit = self.__inner_controller.get_planning_toolkit()
-            goal_node: PathNode = toolkit.pos_to_node(self.__goal_pos)
-            if toolkit.node_is_traversable(goal_node, use_clearance=True):
+            goal_node: PathNode = self.__planning_toolkit.pos_to_node(self.__goal_pos)
+            if self.__planning_toolkit.node_is_traversable(goal_node, use_clearance=True):
                 glColor3f(0, 1, 0)
-            elif toolkit.node_is_traversable(goal_node, use_clearance=False):
+            elif self.__planning_toolkit.node_is_traversable(goal_node, use_clearance=False):
                 glColor3f(1, 0.5, 0)
             else:
                 glColor3f(1, 0, 0)
