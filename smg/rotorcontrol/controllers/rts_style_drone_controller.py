@@ -4,7 +4,7 @@ import pygame
 from OpenGL.GL import *
 from typing import Any, cast, Dict, Optional, List, Tuple
 
-from smg.navigation import Path, PathNode, PlanningToolkit
+from smg.navigation import PathNode, PlanningToolkit
 from smg.opengl import OpenGLUtil
 from smg.pyoctomap import OctomapPicker
 from smg.rigging.cameras import Camera
@@ -114,33 +114,8 @@ class RTSStyleDroneController(DroneController):
 
     def render_ui(self) -> None:
         """Render the user interface for the controller."""
-        # Render the path that the drone is following (if any).
-        path: Optional[Path] = self.__inner_controller.get_path()
-        if path is not None:
-            path.render(
-                start_colour=(0, 1, 1), end_colour=(0, 1, 1), width=5,
-                waypoint_colourer=self.__inner_controller.get_occupancy_colourer()
-            )
-
-        # Render any new waypoints for which a path has not yet been planned.
-        # FIXME: This is currently a bit messy - it needs tidying up and moving somewhere more sensible.
-        glColor3f(1, 1, 0)
-
-        new_waypoints: List[np.ndarray] = self.__inner_controller.get_new_waypoints()
-        waypoints: List[np.ndarray] = self.__inner_controller.get_waypoints()
-        last_waypoint: np.ndarray = self.__inner_controller.get_current_pos()
-        if path is not None and len(new_waypoints) != len(waypoints):
-            last_waypoint = path[-1].position
-
-        glLineWidth(5)
-        for i in range(len(new_waypoints)):
-            OpenGLUtil.render_sphere(new_waypoints[i], 0.1, slices=10, stacks=10)
-            glBegin(GL_LINES)
-            glVertex3f(*last_waypoint)
-            glVertex3f(*new_waypoints[i])
-            glEnd()
-            last_waypoint = new_waypoints[i]
-        glLineWidth(1)
+        # Render the user interface for the inner controller.
+        self.__inner_controller.render_ui()
 
         # If a goal position has been determined:
         if self.__goal_pos is not None:

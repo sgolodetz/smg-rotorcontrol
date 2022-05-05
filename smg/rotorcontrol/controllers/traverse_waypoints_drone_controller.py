@@ -7,10 +7,12 @@ import threading
 import time
 import vg
 
+from OpenGL.GL import *
 from timeit import default_timer as timer
-from typing import Callable, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from smg.navigation import AStarPathPlanner, Path, PlanningToolkit
+from smg.opengl import OpenGLUtil
 from smg.rigging.cameras import SimpleCamera
 from smg.rigging.helpers import CameraPoseConverter
 from smg.rotory.drones import Drone
@@ -88,10 +90,6 @@ class TraverseWaypointsDroneController(DroneController):
         """Get any new (i.e. as yet unplanned) waypoints that the drone should traverse."""
         with self.__lock:
             return self.__waypoints[-self.__new_waypoint_count:] if self.__new_waypoint_count > 0 else []
-
-    def get_occupancy_colourer(self) -> Callable[[np.ndarray], np.ndarray]:
-        """Get a function that can be used to colour waypoints on a path based on their occupancy status."""
-        return self.__planning_toolkit.occupancy_colourer()
 
     def get_path(self) -> Optional[Path]:
         """Get a copy of the path (if any), or None otherwise."""
@@ -244,6 +242,37 @@ class TraverseWaypointsDroneController(DroneController):
             # If the drone should stop moving, stop it.
             if stop_drone:
                 self.__drone.stop()
+
+    def render_ui(self) -> None:
+        """Render the user interface for the controller."""
+        # Render the path that the drone is following (if any).
+        path: Optional[Path] = self.get_path()
+        if path is not None:
+            path.render(
+                start_colour=(0, 1, 1), end_colour=(0, 1, 1), width=5,
+                waypoint_colourer=self.__planning_toolkit.occupancy_colourer()
+            )
+
+        # Render any new waypoints for which a path has not yet been planned.
+        # FIXME: This is currently a bit messy - it needs tidying up and moving somewhere more sensible.
+        glColor3f(1, 1, 0)
+
+        new_waypoints: List[np.ndarray] = self.get_new_waypoints()
+        waypoints: List[np.ndarray] = self.get_waypoints()
+        last_waypoint: Optional[np.ndarray] = self.get_current_pos()
+        if path is not None and len(new_waypoints) != len(waypoints):
+            last_waypoint = path[-1].position
+
+        if last_waypoint is not None:
+            glLineWidth(5)
+            for i in range(len(new_waypoints)):
+                OpenGLUtil.render_sphere(new_waypoints[i], 0.1, slices=10, stacks=10)
+                glBegin(GL_LINES)
+                glVertex3f(*last_waypoint)
+                glVertex3f(*new_waypoints[i])
+                glEnd()
+                last_waypoint = new_waypoints[i]
+            glLineWidth(1)
 
     def set_waypoints(self, waypoints: List[np.ndarray]) -> None:
         """
