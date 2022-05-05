@@ -13,6 +13,7 @@ from smg.rigging.helpers import CameraPoseConverter
 from smg.rotory.drones import Drone
 
 from .drone_controller import DroneController
+from .takeoff_drone_controller import TakeoffDroneController
 from .traverse_waypoints_drone_controller import TraverseWaypointsDroneController
 
 
@@ -46,9 +47,6 @@ class RTSStyleDroneController(DroneController):
         self.__picker_pos: Optional[np.ndarray] = None
         self.__planning_toolkit: PlanningToolkit = cast(PlanningToolkit, planning_toolkit)
         self.__viewing_camera: Camera = viewing_camera
-
-        # FIXME: Remove this once command chaining is supported.
-        drone.takeoff()
 
     # PUBLIC METHODS
 
@@ -110,7 +108,7 @@ class RTSStyleDroneController(DroneController):
                         debug=self.__debug, drone=self.__drone, planning_toolkit=self.__planning_toolkit
                     )
 
-                # If the user is currently pressing the 'left shift' key:
+                # If the user is currently pressing one of the shift keys:
                 if pygame.key.get_mods() & pygame.KMOD_SHIFT:
                     # Append the goal position to the traverse waypoint controller's existing list of waypoints.
                     traverse_waypoints_controller.append_waypoints([self.__goal_pos])
@@ -120,7 +118,7 @@ class RTSStyleDroneController(DroneController):
                     if type(active_inner_controller) is not TraverseWaypointsDroneController:
                         self.__inner_controllers.append(traverse_waypoints_controller)
 
-                # Otherwise, if the user is not currently pressing the 'left shift' key:
+                # Otherwise, if the user is not currently pressing one of the shift keys:
                 else:
                     # Replace the traverse waypoint controller's list of waypoints with a singleton list containing
                     # the goal position.
@@ -132,18 +130,45 @@ class RTSStyleDroneController(DroneController):
                         for inner_controller in self.__inner_controllers:
                             inner_controller.terminate()
 
-                        # Replace the queue of inner controllers with a singleton queue containing only the newly
-                        # constructed controller, and update the active inner controller.
-                        self.__inner_controllers = deque([traverse_waypoints_controller])
+                        # Update the active inner controller, and replace the queue of inner controllers with a
+                        # singleton queue containing only the newly active controller.
                         active_inner_controller = traverse_waypoints_controller
+                        self.__inner_controllers = deque([active_inner_controller])
+
+            # If the user clicks the right mouse button:
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+                # If there is not an active takeoff controller:
+                if type(active_inner_controller) is not TakeoffDroneController:
+                    # Construct a new takeoff controller.
+                    takeoff_controller: TakeoffDroneController = TakeoffDroneController(drone=self.__drone)
+
+                    # If the user is currently pressing one of the shift keys:
+                    if pygame.key.get_mods() & pygame.KMOD_SHIFT:
+                        # TODO: Comment here.
+                        self.__inner_controllers.append(takeoff_controller)
+
+                    # Otherwise, if the user is not currently pressing one of the shift keys:
+                    else:
+                        # Terminate all existing inner controllers.
+                        for inner_controller in self.__inner_controllers:
+                            inner_controller.terminate()
+
+                        # Update the active inner controller, and replace the queue of inner controllers with a
+                        # singleton queue containing only the newly active controller.
+                        active_inner_controller = takeoff_controller
+                        self.__inner_controllers = deque([active_inner_controller])
 
             # If the user scrolls the mouse wheel, change the desired offset of the goal position above the floor.
             elif event.type == pygame.MOUSEWHEEL:
                 self.__height_offset = np.clip(self.__height_offset + event.y * 0.2, 0.3, 3.0)
 
-        # Delegate lower-level control of the drone to the active inner controller (if any).
+        # Delegate lower-level control of the drone to the active inner controller (if any). If the active controller
+        # finishes, remove it from the queue and move on to the next one (if any).
         if active_inner_controller is not None:
             active_inner_controller.iterate(**kwargs)
+            if active_inner_controller.has_finished():
+                active_inner_controller.terminate()
+                self.__inner_controllers.popleft()
 
     def render_ui(self) -> None:
         """Render the user interface for the controller."""

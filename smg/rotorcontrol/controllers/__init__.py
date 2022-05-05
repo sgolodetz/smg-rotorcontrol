@@ -2,4 +2,5 @@ from .drone_controller import DroneController
 from .futaba_t6k_drone_controller import FutabaT6KDroneController
 from .keyboard_drone_controller import KeyboardDroneController
 from .rts_style_drone_controller import RTSStyleDroneController
+from .takeoff_drone_controller import TakeoffDroneController
 from .traverse_waypoints_drone_controller import TraverseWaypointsDroneController
