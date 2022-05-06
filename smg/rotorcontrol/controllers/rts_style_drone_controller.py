@@ -152,7 +152,9 @@ class RTSStyleDroneController(DroneController):
                 # If the user is currently pressing one of the control keys, make a landing controller.
                 # Otherwise, make a takeoff controller.
                 if pygame.key.get_mods() & pygame.KMOD_CTRL:
-                    new_controller: DroneController = LandingDroneController(drone=self.__drone)
+                    new_controller: DroneController = LandingDroneController(
+                        drone=self.__drone, planning_toolkit=self.__planning_toolkit
+                    )
                 else:
                     new_controller: DroneController = TakeoffDroneController(drone=self.__drone)
 

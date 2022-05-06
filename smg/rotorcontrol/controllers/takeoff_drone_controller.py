@@ -79,8 +79,9 @@ class TakeoffDroneController(DroneController):
     def render_ui(self) -> None:
         """Render the user interface for the controller."""
         estimated_start_pos: Optional[np.ndarray] = self.get_estimated_start_pos()
-        if estimated_start_pos is not None:
+        estimated_end_pos: Optional[np.ndarray] = self.get_estimated_end_pos()
+        if estimated_start_pos is not None and estimated_end_pos is not None:
             glColor3f(0, 1, 0)
             OpenGLUtil.render_cylinder(
-                estimated_start_pos, estimated_start_pos + np.array([0.0, -0.5, 0.0]), 0.1, 0.0, slices=10
+                estimated_start_pos, estimated_end_pos, 0.1, 0.0, slices=10
             )
