@@ -32,7 +32,7 @@ class TakeoffDroneController(DroneController):
     def get_estimated_end_pos(self) -> Optional[np.ndarray]:
         """TODO"""
         # FIXME: Do this properly.
-        return self.get_estimated_start_pos()
+        return self.get_estimated_start_pos() + np.array([0.0, -1.0, 0.0])
 
     def has_finished(self) -> bool:
         """
