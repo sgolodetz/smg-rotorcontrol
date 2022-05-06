@@ -35,11 +35,12 @@ class LandingDroneController(DroneController):
 
     def get_estimated_end_pos(self) -> Optional[np.ndarray]:
         """TODO"""
-        if self.__estimated_end_pos is None:
+        estimated_start_pos: Optional[np.ndarray] = self.get_estimated_start_pos()
+
+        # TODO: Comment here.
+        if estimated_start_pos is not None and self.__estimated_end_pos is None:
             # TODO: Comment here.
-            ground_vpos: Optional[np.ndarray] = self.__planning_toolkit.find_flat_ground_below(
-                self.get_estimated_start_pos()
-            )
+            ground_vpos: Optional[np.ndarray] = self.__planning_toolkit.find_flat_ground_below(estimated_start_pos)
 
             # TODO: Comment here.
             if ground_vpos is not None:
@@ -48,7 +49,7 @@ class LandingDroneController(DroneController):
 
             # TODO: Comment here.
             else:
-                self.__estimated_end_pos = self.get_estimated_start_pos()
+                self.__estimated_end_pos = estimated_start_pos
 
         return self.__estimated_end_pos
 
