@@ -38,6 +38,8 @@ class TraverseWaypointsDroneController(DroneController):
         :param drone:               The drone.
         :param planning_toolkit:    The planning toolkit (used for path planning).
         """
+        super().__init__()
+
         self.__alive: bool = False
 
         self.__ay: float = 10
@@ -85,6 +87,11 @@ class TraverseWaypointsDroneController(DroneController):
         """Get the current position of the drone (if available yet), or None otherwise."""
         with self.__lock:
             return self.__current_pos.copy() if self.__current_pos is not None else None
+
+    def get_estimated_end_pos(self) -> Optional[np.ndarray]:
+        """TODO"""
+        waypoints: List[np.ndarray] = self.get_waypoints()
+        return waypoints[-1] if len(waypoints) > 0 else None
 
     def get_new_waypoints(self) -> List[np.ndarray]:
         """Get any new (i.e. as yet unplanned) waypoints that the drone should traverse."""
@@ -144,11 +151,16 @@ class TraverseWaypointsDroneController(DroneController):
                     self.__movement_allowed = not self.__movement_allowed
 
         with self.__lock:
-            # Extract the current position of the drone from the tracker pose provided.
-            tracker_i_t_c: np.ndarray = np.linalg.inv(tracker_c_t_i)
-            self.__current_pos: np.ndarray = tracker_i_t_c[0:3, 3].copy()
+            # --- Step 2: Update the drone's current position, and ensure its estimated start position is set ---#
 
-            # --- Step 2: Trigger Path Planning (if required) ---#
+            # Extract the current position of the drone from the tracker pose provided.
+            self.__current_pos: np.ndarray = DroneController._extract_current_pos(tracker_c_t_i)
+
+            # Set the estimated start position to the current position of the drone if it's not already known.
+            if self.get_estimated_start_pos() is None:
+                self.set_estimated_start_pos(self.__current_pos.copy())
+
+            # --- Step 3: Trigger Path Planning (if required) ---#
 
             # If there are any waypoints through which a path has not yet been planned, tell the path planner
             # that some path planning is needed.
@@ -156,7 +168,7 @@ class TraverseWaypointsDroneController(DroneController):
                 self.__planning_is_needed = True
                 self.__planning_needed.notify()
 
-            # --- Step 3: Update Current Path --- #
+            # --- Step 4: Update Current Path --- #
 
             # If there's a current path, update it based on the drone's current position.
             if self.__path is not None:
@@ -193,7 +205,7 @@ class TraverseWaypointsDroneController(DroneController):
                     # noinspection PyUnboundLocalVariable
                     print(f"Path Updating: {end - start}s")
 
-            # --- Step 4: Make Drone Follow Current Path --- #
+            # --- Step 5: Make Drone Follow Current Path --- #
 
             # A flag indicating whether or not the drone should stop moving. This will be set to False if any reason
             # is found for the drone to continue moving.
@@ -265,6 +277,8 @@ class TraverseWaypointsDroneController(DroneController):
         new_waypoints: List[np.ndarray] = self.get_new_waypoints()
         waypoints: List[np.ndarray] = self.get_waypoints()
         last_waypoint: Optional[np.ndarray] = self.get_current_pos()
+        if last_waypoint is None:
+            last_waypoint = self.get_estimated_start_pos()
         if path is not None and len(new_waypoints) != len(waypoints):
             last_waypoint = path[-1].position
 

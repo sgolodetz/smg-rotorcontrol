@@ -23,6 +23,8 @@ class FutabaT6KDroneController(DroneController):
 
         :param drone:   The drone.
         """
+        super().__init__()
+
         self.__can_move_gimbal: bool = False
         self.__drone: Drone = drone
 

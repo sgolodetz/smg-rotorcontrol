@@ -11,6 +11,12 @@ from typing import List, Optional, Tuple
 class DroneController(ABC):
     """A flight controller for a drone."""
 
+    # CONSTRUCTOR
+
+    def __init__(self):
+        """Construct a flight controller for a drone."""
+        self.__estimated_start_pos: Optional[np.ndarray] = None
+
     # PUBLIC ABSTRACT METHODS
 
     @abstractmethod
@@ -35,6 +41,15 @@ class DroneController(ABC):
     # PUBLIC METHODS
 
     # noinspection PyMethodMayBeStatic
+    def get_estimated_end_pos(self) -> Optional[np.ndarray]:
+        """TODO"""
+        return None
+
+    def get_estimated_start_pos(self) -> Optional[np.ndarray]:
+        """TODO"""
+        return self.__estimated_start_pos
+
+    # noinspection PyMethodMayBeStatic
     def has_finished(self) -> bool:
         """
         Get whether or not the controller has finished.
@@ -47,6 +62,27 @@ class DroneController(ABC):
         """Render the user interface for the controller."""
         pass
 
+    def set_estimated_start_pos(self, estimated_start_pos: Optional[np.ndarray]) -> None:
+        """
+        TODO
+
+        :param estimated_start_pos: TODO
+        """
+        self.__estimated_start_pos = estimated_start_pos
+
     def terminate(self) -> None:
         """Tell the controller to terminate."""
         pass
+
+    # PROTECTED STATIC METHODS
+
+    @staticmethod
+    def _extract_current_pos(tracker_c_t_i: np.ndarray) -> np.ndarray:
+        """
+        TODO
+
+        :param tracker_c_t_i:   TODO
+        :return:                TODO
+        """
+        tracker_i_t_c: np.ndarray = np.linalg.inv(tracker_c_t_i)
+        return tracker_i_t_c[0:3, 3].copy()

@@ -22,9 +22,28 @@ class LandingDroneController(DroneController):
 
         :param drone:   The drone.
         """
+        super().__init__()
         self.__drone: Drone = drone
 
     # PUBLIC METHODS
+
+    def get_estimated_end_pos(self) -> Optional[np.ndarray]:
+        """TODO"""
+        # FIXME: Do this properly.
+        return self.get_estimated_start_pos()
+
+    def has_finished(self) -> bool:
+        """
+        Get whether or not the controller has finished.
+
+        :return:    True, if the controller has finished, or False otherwise.
+        """
+        if type(self.__drone) is SimulatedDrone:
+            simulated_drone: SimulatedDrone = cast(SimulatedDrone, self.__drone)
+            return simulated_drone.get_state() == SimulatedDrone.IDLE
+        else:
+            # TODO: We still need to make this work for real drones.
+            return False
 
     def iterate(self, *, altitude: Optional[float] = None, events: Optional[List[pygame.event.Event]] = None,
                 image: np.ndarray, image_timestamp: Optional[float] = None,
@@ -42,6 +61,11 @@ class LandingDroneController(DroneController):
                                     by any tracker that's running (optional). Note that if the tracker is a monocular
                                     one, the transformation will be non-metric.
         """
+        # Set the estimated start position to the current position of the drone if it's not already known.
+        if self.get_estimated_start_pos() is None:
+            self.set_estimated_start_pos(DroneController._extract_current_pos(tracker_c_t_i))
+
+        # TODO: Comment here.
         if type(self.__drone) is SimulatedDrone:
             simulated_drone: SimulatedDrone = cast(SimulatedDrone, self.__drone)
             if simulated_drone.get_state() == SimulatedDrone.FLYING:
@@ -49,21 +73,6 @@ class LandingDroneController(DroneController):
         else:
             # TODO: We still need to make this work for real drones.
             pass
-
-    # PUBLIC METHODS
-
-    def has_finished(self) -> bool:
-        """
-        Get whether or not the controller has finished.
-
-        :return:    True, if the controller has finished, or False otherwise.
-        """
-        if type(self.__drone) is SimulatedDrone:
-            simulated_drone: SimulatedDrone = cast(SimulatedDrone, self.__drone)
-            return simulated_drone.get_state() == SimulatedDrone.IDLE
-        else:
-            # TODO: We still need to make this work for real drones.
-            return False
 
     def render_ui(self) -> None:
         """Render the user interface for the controller."""

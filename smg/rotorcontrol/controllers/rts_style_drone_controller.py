@@ -34,6 +34,8 @@ class RTSStyleDroneController(DroneController):
         :param planning_toolkit:    The planning toolkit (used for path planning).
         :param viewing_camera:      The virtual camera being used to view the scene.
         """
+        super().__init__()
+
         if picker is None:
             raise RuntimeError("Error: An RTS-style drone controller requires a picker for the scene")
         if planning_toolkit is None:
@@ -116,9 +118,15 @@ class RTSStyleDroneController(DroneController):
                     # Append the goal position to the traverse waypoint controller's existing list of waypoints.
                     traverse_waypoints_controller.append_waypoints([self.__goal_pos])
 
-                    # If the last inner controller is not a traverse waypoints controller, append the newly
-                    # constructed controller to the queue of inner controllers.
+                    # If the last inner controller is not a traverse waypoints controller:
                     if type(last_inner_controller) is not TraverseWaypointsDroneController:
+                        # TODO: Comment here.
+                        if last_inner_controller is not None:
+                            traverse_waypoints_controller.set_estimated_start_pos(
+                                last_inner_controller.get_estimated_end_pos()
+                            )
+
+                        # Append the newly constructed controller to the queue of inner controllers.
                         self.__inner_controllers.append(traverse_waypoints_controller)
 
                 # Otherwise, if the user is not currently pressing one of the shift keys:
@@ -150,6 +158,10 @@ class RTSStyleDroneController(DroneController):
 
                 # If the user is currently pressing one of the shift keys:
                 if pygame.key.get_mods() & pygame.KMOD_SHIFT:
+                    # TODO: Comment here.
+                    if last_inner_controller is not None:
+                        new_controller.set_estimated_start_pos(last_inner_controller.get_estimated_end_pos())
+
                     # Append the newly constructed controller to the queue of inner controllers.
                     self.__inner_controllers.append(new_controller)
 

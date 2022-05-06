@@ -22,6 +22,7 @@ class KeyboardDroneController(DroneController):
 
         :param drone:   The drone.
         """
+        super().__init__()
         self.__drone: Drone = drone
 
     # PUBLIC METHODS
