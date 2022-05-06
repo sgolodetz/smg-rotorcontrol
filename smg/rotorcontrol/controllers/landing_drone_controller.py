@@ -4,8 +4,10 @@ import os
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame
 
+from OpenGL.GL import *
 from typing import cast, List, Optional, Tuple
 
+from smg.opengl import OpenGLUtil
 from smg.rotory.drones import Drone, SimulatedDrone
 
 from .drone_controller import DroneController
@@ -76,5 +78,9 @@ class LandingDroneController(DroneController):
 
     def render_ui(self) -> None:
         """Render the user interface for the controller."""
-        # TODO
-        pass
+        estimated_start_pos: Optional[np.ndarray] = self.get_estimated_start_pos()
+        if estimated_start_pos is not None:
+            glColor3f(1, 0, 0)
+            OpenGLUtil.render_cylinder(
+                estimated_start_pos, estimated_start_pos + np.array([0.0, 0.5, 0.0]), 0.1, 0.0, slices=10
+            )
