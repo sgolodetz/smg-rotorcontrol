@@ -103,8 +103,8 @@ class RTSStyleDroneController(DroneController):
         for event in events:
             # If the user clicks the left mouse button, and a goal position has been determined:
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.__goal_pos is not None:
-                # If the user is currently pressing one of the shift keys:
-                if pygame.key.get_mods() & pygame.KMOD_SHIFT:
+                # If the user is currently pressing one of the shift keys and there were existing inner controllers:
+                if (pygame.key.get_mods() & pygame.KMOD_SHIFT) and last_inner_controller is not None:
                     # If the last inner controller is a traverse waypoints controller, reuse it.
                     # Otherwise, construct a new one.
                     traverse_waypoints_controller: Optional[TraverseWaypointsDroneController] = None
@@ -121,10 +121,9 @@ class RTSStyleDroneController(DroneController):
                     # If the last inner controller is not a traverse waypoints controller:
                     if type(last_inner_controller) is not TraverseWaypointsDroneController:
                         # TODO: Comment here.
-                        if last_inner_controller is not None:
-                            traverse_waypoints_controller.set_estimated_start_pos(
-                                last_inner_controller.get_estimated_end_pos()
-                            )
+                        traverse_waypoints_controller.set_estimated_start_pos(
+                            last_inner_controller.get_estimated_end_pos()
+                        )
 
                         # Append the newly constructed controller to the queue of inner controllers.
                         self.__inner_controllers.append(traverse_waypoints_controller)
@@ -158,11 +157,10 @@ class RTSStyleDroneController(DroneController):
                 else:
                     new_controller: DroneController = TakeoffDroneController(drone=self.__drone)
 
-                # If the user is currently pressing one of the shift keys:
-                if pygame.key.get_mods() & pygame.KMOD_SHIFT:
+                # If the user is currently pressing one of the shift keys and there were existing inner controllers:
+                if (pygame.key.get_mods() & pygame.KMOD_SHIFT) and last_inner_controller is not None:
                     # TODO: Comment here.
-                    if last_inner_controller is not None:
-                        new_controller.set_estimated_start_pos(last_inner_controller.get_estimated_end_pos())
+                    new_controller.set_estimated_start_pos(last_inner_controller.get_estimated_end_pos())
 
                     # Append the newly constructed controller to the queue of inner controllers.
                     self.__inner_controllers.append(new_controller)
