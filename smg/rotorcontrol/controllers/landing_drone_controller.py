@@ -106,13 +106,14 @@ class LandingDroneController(DroneController):
             # TODO: Comment here.
             glDepthMask(False)
 
+            # TODO: Comment here.
             glEnable(GL_BLEND)
             glBlendColor(0.5, 0.5, 0.5, 0.5)
             glBlendFunc(GL_CONSTANT_COLOR, GL_ONE_MINUS_CONSTANT_COLOR)
 
             # TODO: Comment here.
             glColor3f(1, 0, 0)
-            OpenGLUtil.render_cylinder(estimated_start_pos, estimated_end_pos, 0.1, 0.0, slices=10)
+            OpenGLUtil.render_cylinder(estimated_start_pos, estimated_end_pos, 0.11, 0.0, slices=10)
 
             # TODO: Comment here.
             glDisable(GL_BLEND)

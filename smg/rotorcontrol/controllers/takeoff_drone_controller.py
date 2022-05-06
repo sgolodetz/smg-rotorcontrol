@@ -94,7 +94,7 @@ class TakeoffDroneController(DroneController):
 
             # TODO: Comment here.
             glColor3f(0, 1, 0)
-            OpenGLUtil.render_cylinder(estimated_start_pos, estimated_end_pos, 0.1, 0.0, slices=10)
+            OpenGLUtil.render_cylinder(estimated_start_pos, estimated_end_pos, 0.11, 0.0, slices=10)
 
             # TODO: Comment here.
             glDisable(GL_BLEND)
