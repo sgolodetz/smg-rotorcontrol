@@ -7,6 +7,8 @@ import pygame
 from abc import ABC, abstractmethod
 from typing import List, Optional, Tuple
 
+from smg.rotory.drones import Drone
+
 
 class DroneController(ABC):
     """A flight controller for a drone."""
@@ -48,6 +50,11 @@ class DroneController(ABC):
     def get_estimated_start_pos(self) -> Optional[np.ndarray]:
         """TODO"""
         return self.__estimated_start_pos
+
+    # noinspection PyMethodMayBeStatic
+    def get_expected_end_state(self) -> Optional[Drone.EState]:
+        """TODO"""
+        return None
 
     # noinspection PyMethodMayBeStatic
     def has_finished(self) -> bool:

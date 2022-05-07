@@ -53,6 +53,11 @@ class LandingDroneController(DroneController):
 
         return self.__estimated_end_pos
 
+    def get_expected_end_state(self) -> Optional[Drone.EState]:
+        """TODO"""
+        # FIXME: Do this properly.
+        return Drone.IDLE
+
     def has_finished(self) -> bool:
         """
         Get whether or not the controller has finished.

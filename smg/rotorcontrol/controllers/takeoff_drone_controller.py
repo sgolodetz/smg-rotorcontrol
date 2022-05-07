@@ -34,6 +34,10 @@ class TakeoffDroneController(DroneController):
         # FIXME: Do this properly.
         return self.get_estimated_start_pos() + np.array([0.0, -1.0, 0.0])
 
+    def get_expected_end_state(self) -> Optional[Drone.EState]:
+        """TODO"""
+        return Drone.FLYING
+
     def has_finished(self) -> bool:
         """
         Get whether or not the controller has finished.

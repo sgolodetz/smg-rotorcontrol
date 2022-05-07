@@ -93,6 +93,10 @@ class TraverseWaypointsDroneController(DroneController):
         waypoints: List[np.ndarray] = self.get_waypoints()
         return waypoints[-1] if len(waypoints) > 0 else None
 
+    def get_expected_end_state(self) -> Optional[Drone.EState]:
+        """TODO"""
+        return Drone.FLYING
+
     def get_new_waypoints(self) -> List[np.ndarray]:
         """Get any new (i.e. as yet unplanned) waypoints that the drone should traverse."""
         with self.__lock:
