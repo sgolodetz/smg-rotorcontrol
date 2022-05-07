@@ -95,15 +95,14 @@ class RTSStyleDroneController(DroneController):
             self.__picker_pos = None
             self.__goal_pos = None
 
-        # Get the last inner controller (if any).
-        last_inner_controller: Optional[DroneController] = self.__get_last_inner_controller()
-
         # Process any PyGame events that have happened since the last iteration.
         for event in events:
             # If the user is clicking a mouse button:
             if event.type == pygame.MOUSEBUTTONDOWN:
                 # If the user is currently pressing one of the shift keys (indicating that an append is desired),
                 # and the last inner controller is not None (indicating that an append is possible):
+                last_inner_controller: Optional[DroneController] = self.__get_last_inner_controller()
+
                 if (pygame.key.get_mods() & pygame.KMOD_SHIFT) and last_inner_controller is not None:
                     # Try to make and append a new inner controller.
                     self.__try_append_new_inner_controller(event, last_inner_controller)
@@ -111,7 +110,7 @@ class RTSStyleDroneController(DroneController):
                 # Otherwise:
                 else:
                     # Try to make and set a new inner controller.
-                    new_controller: Optional[DroneController] = self.__try_set_new_inner_controller(event)
+                    self.__try_set_new_inner_controller(event)
 
             # If the user scrolls the mouse wheel, change the desired offset of the goal position above the floor.
             elif event.type == pygame.MOUSEWHEEL:
@@ -173,6 +172,9 @@ class RTSStyleDroneController(DroneController):
         for inner_controller in self.__inner_controllers:
             inner_controller.terminate()
 
+        # Clear the inner controllers queue.
+        self.__inner_controllers = deque()
+
     def __get_active_inner_controller(self) -> Optional[DroneController]:
         """
         Get the active inner controller (if any).
@@ -189,20 +191,23 @@ class RTSStyleDroneController(DroneController):
         """
         return self.__inner_controllers[-1] if len(self.__inner_controllers) > 0 else None
 
-    def __try_append_new_inner_controller(
-        self, event: pygame.event.Event, last_inner_controller: Optional[DroneController]
-    ) -> None:
+    def __try_append_new_inner_controller(self, event: pygame.event.Event,
+                                          last_inner_controller: Optional[DroneController]) -> None:
         """
-        TODO
+        Try to append a new inner controller to the queue, as instructed by a PyGame event.
 
-        :param event:   TODO
+        .. note::
+            For certain controllers, the last controller in the queue may be reused if possible.
+
+        :param event:                   The PyGame event.
+        :param last_inner_controller:   The most recent inner controller in the existing queue.
         """
         new_controller: Optional[DroneController] = None
 
         # If the user is clicking the left mouse button, and a goal position has been determined:
         if event.button == 1 and self.__goal_pos is not None:
-            # If the last inner controller is a traverse waypoints controller, reuse it.
-            # Otherwise, construct a new one.
+            # If the last inner controller is a traverse waypoints controller, reuse it, else construct a new one.
+            # noinspection PyUnusedLocal
             traverse_waypoints_controller: Optional[TraverseWaypointsDroneController] = None
             if type(last_inner_controller) is TraverseWaypointsDroneController:
                 traverse_waypoints_controller = cast(TraverseWaypointsDroneController, last_inner_controller)
@@ -211,7 +216,7 @@ class RTSStyleDroneController(DroneController):
                     debug=self.__debug, drone=self.__drone, planning_toolkit=self.__planning_toolkit
                 )
 
-                # TODO: Comment here.
+                # If we do construct a new controller, record that, as it will need to be appended to the queue.
                 new_controller = traverse_waypoints_controller
 
             # Append the goal position to the traverse waypoint controller's existing list of waypoints.
@@ -226,27 +231,26 @@ class RTSStyleDroneController(DroneController):
             else:
                 new_controller = TakeoffDroneController(drone=self.__drone)
 
-        # TODO
+        # If a new controller has been constructed:
         if new_controller is not None:
-            # TODO: Comment here.
+            # Set its estimated start position as the estimated end position of the previous controller.
             new_controller.set_estimated_start_pos(last_inner_controller.get_estimated_end_pos())
 
             # Append the newly constructed controller to the queue of inner controllers.
             self.__inner_controllers.append(new_controller)
 
-    def __try_set_new_inner_controller(self, event: pygame.event.Event) -> Optional[DroneController]:
+    def __try_set_new_inner_controller(self, event: pygame.event.Event) -> None:
         """
-        TODO
+        Try to clear any existing inner controllers and add a new one to the queue, as instructed by a PyGame event.
 
-        :param event:   TODO
-        :param return:  TODO
+        :param event:   The PyGame event.
         """
         new_controller: Optional[DroneController] = None
 
         # If the user is clicking the left mouse button, and a goal position has been determined:
         if event.button == 1 and self.__goal_pos is not None:
-            # Make a new traverse waypoints controller and set its list of waypoints to be a singleton
-            # list containing the goal position.
+            # Make a traverse waypoints controller and set its list of waypoints to be a singleton list
+            # containing the goal position.
             traverse_waypoints_controller: TraverseWaypointsDroneController = TraverseWaypointsDroneController(
                 debug=self.__debug, drone=self.__drone, planning_toolkit=self.__planning_toolkit
             )
@@ -263,12 +267,10 @@ class RTSStyleDroneController(DroneController):
             else:
                 new_controller = TakeoffDroneController(drone=self.__drone)
 
-        # TODO
+        # If a new controller has been constructed:
         if new_controller is not None:
             # Clear the inner controllers queue.
             self.__clear_inner_controllers()
 
-            # Replace the queue of inner controllers with a singleton containing only the new controller.
+            # Replace the queue of inner controllers with a singleton queue containing only the new controller.
             self.__inner_controllers = deque([new_controller])
-
-        return new_controller
