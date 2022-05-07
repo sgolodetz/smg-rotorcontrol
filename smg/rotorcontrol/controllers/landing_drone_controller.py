@@ -61,7 +61,7 @@ class LandingDroneController(DroneController):
         """
         if type(self.__drone) is SimulatedDrone:
             simulated_drone: SimulatedDrone = cast(SimulatedDrone, self.__drone)
-            return simulated_drone.get_state() == SimulatedDrone.IDLE
+            return simulated_drone.get_state() == Drone.IDLE
         else:
             # TODO: We still need to make this work for real drones.
             return False
@@ -89,7 +89,7 @@ class LandingDroneController(DroneController):
         # TODO: Comment here.
         if type(self.__drone) is SimulatedDrone:
             simulated_drone: SimulatedDrone = cast(SimulatedDrone, self.__drone)
-            if simulated_drone.get_state() == SimulatedDrone.FLYING:
+            if simulated_drone.get_state() == Drone.FLYING:
                 self.__drone.land()
         else:
             # TODO: We still need to make this work for real drones.
