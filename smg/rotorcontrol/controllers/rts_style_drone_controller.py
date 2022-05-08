@@ -212,42 +212,39 @@ class RTSStyleDroneController(DroneController):
         # If the user is clicking the left mouse button, and a goal position has been determined:
         if event.button == 1 and self.__goal_pos is not None:
             # TODO
-            if drone_state is not None and drone_state != Drone.FLYING:
-                return
+            if drone_state is None or drone_state == Drone.FLYING:
+                # If the last inner controller is a traverse waypoints controller, reuse it, else construct a new one.
+                # noinspection PyUnusedLocal
+                traverse_waypoints_controller: Optional[TraverseWaypointsDroneController] = None
+                if type(last_inner_controller) is TraverseWaypointsDroneController:
+                    traverse_waypoints_controller = cast(TraverseWaypointsDroneController, last_inner_controller)
+                else:
+                    traverse_waypoints_controller = TraverseWaypointsDroneController(
+                        debug=self.__debug, drone=self.__drone, planning_toolkit=self.__planning_toolkit
+                    )
 
-            # If the last inner controller is a traverse waypoints controller, reuse it, else construct a new one.
-            # noinspection PyUnusedLocal
-            traverse_waypoints_controller: Optional[TraverseWaypointsDroneController] = None
-            if type(last_inner_controller) is TraverseWaypointsDroneController:
-                traverse_waypoints_controller = cast(TraverseWaypointsDroneController, last_inner_controller)
-            else:
-                traverse_waypoints_controller = TraverseWaypointsDroneController(
-                    debug=self.__debug, drone=self.__drone, planning_toolkit=self.__planning_toolkit
-                )
+                    # If we do construct a new controller, record that, as it will need to be appended to the queue.
+                    new_controller = traverse_waypoints_controller
 
-                # If we do construct a new controller, record that, as it will need to be appended to the queue.
-                new_controller = traverse_waypoints_controller
-
-            # Append the goal position to the traverse waypoint controller's existing list of waypoints.
-            traverse_waypoints_controller.append_waypoints([self.__goal_pos])
+                # Append the goal position to the traverse waypoint controller's existing list of waypoints.
+                traverse_waypoints_controller.append_waypoints([self.__goal_pos])
 
         # Otherwise, if the user is clicking the right mouse button:
         elif event.button == 3:
             # If the user is currently pressing one of the control keys, make a landing controller.
             # Otherwise, make a takeoff controller.
-            if pygame.key.get_mods() & pygame.KMOD_CTRL:
+            # FIXME: Sort out this comment.
+            if (drone_state is not None and drone_state == Drone.FLYING) or (
+                drone_state is None and pygame.key.get_mods() & pygame.KMOD_CTRL
+            ):
                 # TODO
-                if (drone_state is not None and drone_state != Drone.FLYING) or (
-                    drone_pos is not None and self.__planning_toolkit.find_flat_ground_below(drone_pos) is None
-                ):
-                    return
+                if drone_pos is None or self.__planning_toolkit.find_flat_ground_below(drone_pos) is not None:
+                    new_controller = LandingDroneController(
+                        drone=self.__drone, planning_toolkit=self.__planning_toolkit
+                    )
 
-                new_controller = LandingDroneController(drone=self.__drone, planning_toolkit=self.__planning_toolkit)
-            else:
-                # TODO
-                if drone_state is not None and drone_state != Drone.IDLE:
-                    return
-
+            # TODO
+            elif drone_state is None or drone_state == Drone.IDLE:
                 new_controller = TakeoffDroneController(drone=self.__drone)
 
         # If a new controller has been constructed:
@@ -271,35 +268,31 @@ class RTSStyleDroneController(DroneController):
         # If the user is clicking the left mouse button, and a goal position has been determined:
         if event.button == 1 and self.__goal_pos is not None:
             # TODO
-            if drone_state is not None and drone_state != Drone.FLYING:
-                return
+            if drone_state is None or drone_state == Drone.FLYING:
+                # Make a traverse waypoints controller and set its list of waypoints to be a singleton list
+                # containing the goal position.
+                traverse_waypoints_controller: TraverseWaypointsDroneController = TraverseWaypointsDroneController(
+                    debug=self.__debug, drone=self.__drone, planning_toolkit=self.__planning_toolkit
+                )
 
-            # Make a traverse waypoints controller and set its list of waypoints to be a singleton list
-            # containing the goal position.
-            traverse_waypoints_controller: TraverseWaypointsDroneController = TraverseWaypointsDroneController(
-                debug=self.__debug, drone=self.__drone, planning_toolkit=self.__planning_toolkit
-            )
-
-            traverse_waypoints_controller.set_waypoints([self.__goal_pos])
-            new_controller = traverse_waypoints_controller
+                traverse_waypoints_controller.set_waypoints([self.__goal_pos])
+                new_controller = traverse_waypoints_controller
 
         # Otherwise, if the user is clicking the right mouse button:
         elif event.button == 3:
             # If the user is currently pressing one of the control keys, make a landing controller.
             # Otherwise, make a takeoff controller.
-            if pygame.key.get_mods() & pygame.KMOD_CTRL:
+            if (drone_state is not None and drone_state == Drone.FLYING) or (
+                drone_state is None and pygame.key.get_mods() & pygame.KMOD_CTRL
+            ):
                 # TODO
-                if (drone_state is not None and drone_state != Drone.FLYING) or (
-                    drone_pos is not None and self.__planning_toolkit.find_flat_ground_below(drone_pos) is None
-                ):
-                    return
+                if drone_pos is None or self.__planning_toolkit.find_flat_ground_below(drone_pos) is not None:
+                    new_controller = LandingDroneController(
+                        drone=self.__drone, planning_toolkit=self.__planning_toolkit
+                    )
 
-                new_controller = LandingDroneController(drone=self.__drone, planning_toolkit=self.__planning_toolkit)
-            else:
-                # TODO
-                if drone_state is not None and drone_state != Drone.IDLE:
-                    return
-
+            # TODO
+            elif drone_state is None or drone_state == Drone.IDLE:
                 new_controller = TakeoffDroneController(drone=self.__drone)
 
         # If a new controller has been constructed:
