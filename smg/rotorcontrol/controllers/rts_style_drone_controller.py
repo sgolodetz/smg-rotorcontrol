@@ -202,12 +202,13 @@ class RTSStyleDroneController(DroneController):
         :param event:                   The PyGame event.
         :param last_inner_controller:   The most recent inner controller in the existing queue.
         """
+        expected_drone_state: Drone.EState = last_inner_controller.get_expected_end_state()
         new_controller: Optional[DroneController] = None
 
         # If the user is clicking the left mouse button, and a goal position has been determined:
         if event.button == 1 and self.__goal_pos is not None:
             # TODO
-            if last_inner_controller.get_expected_end_state() != Drone.FLYING:
+            if expected_drone_state != Drone.FLYING:
                 return
 
             # If the last inner controller is a traverse waypoints controller, reuse it, else construct a new one.
@@ -232,13 +233,13 @@ class RTSStyleDroneController(DroneController):
             # Otherwise, make a takeoff controller.
             if pygame.key.get_mods() & pygame.KMOD_CTRL:
                 # TODO
-                if last_inner_controller.get_expected_end_state() != Drone.FLYING:
+                if expected_drone_state != Drone.FLYING:
                     return
 
                 new_controller = LandingDroneController(drone=self.__drone, planning_toolkit=self.__planning_toolkit)
             else:
                 # TODO
-                if last_inner_controller.get_expected_end_state() != Drone.IDLE:
+                if expected_drone_state != Drone.IDLE:
                     return
 
                 new_controller = TakeoffDroneController(drone=self.__drone)
@@ -257,10 +258,15 @@ class RTSStyleDroneController(DroneController):
 
         :param event:   The PyGame event.
         """
+        drone_state: Optional[Drone.EState] = self.__drone.get_state()
         new_controller: Optional[DroneController] = None
 
         # If the user is clicking the left mouse button, and a goal position has been determined:
         if event.button == 1 and self.__goal_pos is not None:
+            # TODO
+            if drone_state is not None and drone_state != Drone.FLYING:
+                return
+
             # Make a traverse waypoints controller and set its list of waypoints to be a singleton list
             # containing the goal position.
             traverse_waypoints_controller: TraverseWaypointsDroneController = TraverseWaypointsDroneController(
@@ -275,8 +281,16 @@ class RTSStyleDroneController(DroneController):
             # If the user is currently pressing one of the control keys, make a landing controller.
             # Otherwise, make a takeoff controller.
             if pygame.key.get_mods() & pygame.KMOD_CTRL:
+                # TODO
+                if drone_state is not None and drone_state != Drone.FLYING:
+                    return
+
                 new_controller = LandingDroneController(drone=self.__drone, planning_toolkit=self.__planning_toolkit)
             else:
+                # TODO
+                if drone_state is not None and drone_state != Drone.IDLE:
+                    return
+
                 new_controller = TakeoffDroneController(drone=self.__drone)
 
         # If a new controller has been constructed:
