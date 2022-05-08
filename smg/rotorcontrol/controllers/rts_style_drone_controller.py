@@ -205,14 +205,14 @@ class RTSStyleDroneController(DroneController):
         :param event:                   The PyGame event.
         :param last_inner_controller:   The most recent inner controller in the existing queue.
         """
-        expected_drone_pos: Optional[np.ndarray] = last_inner_controller.get_expected_end_pos()
-        expected_drone_state: Optional[Drone.EState] = last_inner_controller.get_expected_end_state()
+        drone_pos: Optional[np.ndarray] = last_inner_controller.get_expected_end_pos()
+        drone_state: Optional[Drone.EState] = last_inner_controller.get_expected_end_state()
         new_controller: Optional[DroneController] = None
 
         # If the user is clicking the left mouse button, and a goal position has been determined:
         if event.button == 1 and self.__goal_pos is not None:
             # TODO
-            if expected_drone_state is not None and expected_drone_state != Drone.FLYING:
+            if drone_state is not None and drone_state != Drone.FLYING:
                 return
 
             # If the last inner controller is a traverse waypoints controller, reuse it, else construct a new one.
@@ -237,16 +237,15 @@ class RTSStyleDroneController(DroneController):
             # Otherwise, make a takeoff controller.
             if pygame.key.get_mods() & pygame.KMOD_CTRL:
                 # TODO
-                if (expected_drone_state is not None and expected_drone_state != Drone.FLYING) or (
-                    expected_drone_pos is not None
-                    and self.__planning_toolkit.find_flat_ground_below(expected_drone_pos) is None
+                if (drone_state is not None and drone_state != Drone.FLYING) or (
+                    drone_pos is not None and self.__planning_toolkit.find_flat_ground_below(drone_pos) is None
                 ):
                     return
 
                 new_controller = LandingDroneController(drone=self.__drone, planning_toolkit=self.__planning_toolkit)
             else:
                 # TODO
-                if expected_drone_state is not None and expected_drone_state != Drone.IDLE:
+                if drone_state is not None and drone_state != Drone.IDLE:
                     return
 
                 new_controller = TakeoffDroneController(drone=self.__drone)
@@ -254,7 +253,7 @@ class RTSStyleDroneController(DroneController):
         # If a new controller has been constructed:
         if new_controller is not None:
             # Set its estimated start position as the estimated end position of the previous controller.
-            new_controller.set_expected_start_pos(expected_drone_pos)
+            new_controller.set_expected_start_pos(drone_pos)
 
             # Append the newly constructed controller to the queue of inner controllers.
             self.__inner_controllers.append(new_controller)
