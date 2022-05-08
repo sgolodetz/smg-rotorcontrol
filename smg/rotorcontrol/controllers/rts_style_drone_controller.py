@@ -246,7 +246,7 @@ class RTSStyleDroneController(DroneController):
         # If a new controller has been constructed:
         if new_controller is not None:
             # Set its estimated start position as the estimated end position of the previous controller.
-            new_controller.set_estimated_start_pos(last_inner_controller.get_estimated_end_pos())
+            new_controller.set_expected_start_pos(last_inner_controller.get_expected_end_pos())
 
             # Append the newly constructed controller to the queue of inner controllers.
             self.__inner_controllers.append(new_controller)

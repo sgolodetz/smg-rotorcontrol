@@ -17,7 +17,7 @@ class DroneController(ABC):
 
     def __init__(self):
         """Construct a flight controller for a drone."""
-        self.__estimated_start_pos: Optional[np.ndarray] = None
+        self.__expected_start_pos: Optional[np.ndarray] = None
 
     # PUBLIC ABSTRACT METHODS
 
@@ -43,18 +43,18 @@ class DroneController(ABC):
     # PUBLIC METHODS
 
     # noinspection PyMethodMayBeStatic
-    def get_estimated_end_pos(self) -> Optional[np.ndarray]:
+    def get_expected_end_pos(self) -> Optional[np.ndarray]:
         """TODO"""
         return None
-
-    def get_estimated_start_pos(self) -> Optional[np.ndarray]:
-        """TODO"""
-        return self.__estimated_start_pos
 
     # noinspection PyMethodMayBeStatic
     def get_expected_end_state(self) -> Optional[Drone.EState]:
         """TODO"""
         return None
+
+    def get_expected_start_pos(self) -> Optional[np.ndarray]:
+        """TODO"""
+        return self.__expected_start_pos
 
     # noinspection PyMethodMayBeStatic
     def has_finished(self) -> bool:
@@ -69,13 +69,13 @@ class DroneController(ABC):
         """Render the user interface for the controller."""
         pass
 
-    def set_estimated_start_pos(self, estimated_start_pos: Optional[np.ndarray]) -> None:
+    def set_expected_start_pos(self, expected_start_pos: Optional[np.ndarray]) -> None:
         """
         TODO
 
-        :param estimated_start_pos: TODO
+        :param expected_start_pos:  TODO
         """
-        self.__estimated_start_pos = estimated_start_pos
+        self.__expected_start_pos = expected_start_pos
 
     def terminate(self) -> None:
         """Tell the controller to terminate."""

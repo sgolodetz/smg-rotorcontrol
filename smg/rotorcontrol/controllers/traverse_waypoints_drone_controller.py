@@ -88,7 +88,7 @@ class TraverseWaypointsDroneController(DroneController):
         with self.__lock:
             return self.__current_pos.copy() if self.__current_pos is not None else None
 
-    def get_estimated_end_pos(self) -> Optional[np.ndarray]:
+    def get_expected_end_pos(self) -> Optional[np.ndarray]:
         """TODO"""
         waypoints: List[np.ndarray] = self.get_waypoints()
         return waypoints[-1] if len(waypoints) > 0 else None
@@ -161,8 +161,8 @@ class TraverseWaypointsDroneController(DroneController):
             self.__current_pos: np.ndarray = DroneController._extract_current_pos(tracker_c_t_i)
 
             # Set the estimated start position to the current position of the drone if it's not already known.
-            if self.get_estimated_start_pos() is None:
-                self.set_estimated_start_pos(self.__current_pos.copy())
+            if self.get_expected_start_pos() is None:
+                self.set_expected_start_pos(self.__current_pos.copy())
 
             # --- Step 3: Trigger Path Planning (if required) ---#
 
@@ -282,7 +282,7 @@ class TraverseWaypointsDroneController(DroneController):
         waypoints: List[np.ndarray] = self.get_waypoints()
         last_waypoint: Optional[np.ndarray] = self.get_current_pos()
         if last_waypoint is None:
-            last_waypoint = self.get_estimated_start_pos()
+            last_waypoint = self.get_expected_start_pos()
         if path is not None and len(new_waypoints) != len(waypoints):
             last_waypoint = path[-1].position
 

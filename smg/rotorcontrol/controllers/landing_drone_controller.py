@@ -28,30 +28,30 @@ class LandingDroneController(DroneController):
         """
         super().__init__()
         self.__drone: Drone = drone
-        self.__estimated_end_pos: Optional[np.ndarray] = None
+        self.__expected_end_pos: Optional[np.ndarray] = None
         self.__planning_toolkit: PlanningToolkit = planning_toolkit
 
     # PUBLIC METHODS
 
-    def get_estimated_end_pos(self) -> Optional[np.ndarray]:
+    def get_expected_end_pos(self) -> Optional[np.ndarray]:
         """TODO"""
-        estimated_start_pos: Optional[np.ndarray] = self.get_estimated_start_pos()
+        expected_start_pos: Optional[np.ndarray] = self.get_expected_start_pos()
 
         # TODO: Comment here.
-        if estimated_start_pos is not None and self.__estimated_end_pos is None:
+        if expected_start_pos is not None and self.__expected_end_pos is None:
             # TODO: Comment here.
-            ground_vpos: Optional[np.ndarray] = self.__planning_toolkit.find_flat_ground_below(estimated_start_pos)
+            ground_vpos: Optional[np.ndarray] = self.__planning_toolkit.find_flat_ground_below(expected_start_pos)
 
             # TODO: Comment here.
             if ground_vpos is not None:
                 resolution: float = self.__planning_toolkit.get_tree().get_resolution()
-                self.__estimated_end_pos = ground_vpos + np.array([0.0, -resolution, 0.0])
+                self.__expected_end_pos = ground_vpos + np.array([0.0, -resolution, 0.0])
 
             # TODO: Comment here.
             else:
-                self.__estimated_end_pos = estimated_start_pos
+                self.__expected_end_pos = expected_start_pos
 
-        return self.__estimated_end_pos
+        return self.__expected_end_pos
 
     def get_expected_end_state(self) -> Optional[Drone.EState]:
         """TODO"""
@@ -88,8 +88,8 @@ class LandingDroneController(DroneController):
                                     one, the transformation will be non-metric.
         """
         # Set the estimated start position to the current position of the drone if it's not already known.
-        if self.get_estimated_start_pos() is None:
-            self.set_estimated_start_pos(DroneController._extract_current_pos(tracker_c_t_i))
+        if self.get_expected_start_pos() is None:
+            self.set_expected_start_pos(DroneController._extract_current_pos(tracker_c_t_i))
 
         # TODO: Comment here.
         if type(self.__drone) is SimulatedDrone:
@@ -103,11 +103,11 @@ class LandingDroneController(DroneController):
     def render_ui(self) -> None:
         """Render the user interface for the controller."""
         # TODO: Comment here.
-        estimated_start_pos: Optional[np.ndarray] = self.get_estimated_start_pos()
-        estimated_end_pos: Optional[np.ndarray] = self.get_estimated_end_pos()
+        expected_start_pos: Optional[np.ndarray] = self.get_expected_start_pos()
+        expected_end_pos: Optional[np.ndarray] = self.get_expected_end_pos()
 
         # TODO: Comment here.
-        if estimated_start_pos is not None and estimated_end_pos is not None:
+        if expected_start_pos is not None and expected_end_pos is not None:
             # TODO: Comment here.
             glDepthMask(False)
 
@@ -118,7 +118,7 @@ class LandingDroneController(DroneController):
 
             # TODO: Comment here.
             glColor3f(1, 0, 0)
-            OpenGLUtil.render_cylinder(estimated_start_pos, estimated_end_pos, 0.11, 0.0, slices=10)
+            OpenGLUtil.render_cylinder(expected_start_pos, expected_end_pos, 0.11, 0.0, slices=10)
 
             # TODO: Comment here.
             glDisable(GL_BLEND)

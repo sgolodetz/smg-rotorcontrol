@@ -29,10 +29,10 @@ class TakeoffDroneController(DroneController):
 
     # PUBLIC METHODS
 
-    def get_estimated_end_pos(self) -> Optional[np.ndarray]:
+    def get_expected_end_pos(self) -> Optional[np.ndarray]:
         """TODO"""
         # FIXME: Do this properly.
-        return self.get_estimated_start_pos() + np.array([0.0, -1.0, 0.0])
+        return self.get_expected_start_pos() + np.array([0.0, -1.0, 0.0])
 
     def get_expected_end_state(self) -> Optional[Drone.EState]:
         """TODO"""
@@ -68,8 +68,8 @@ class TakeoffDroneController(DroneController):
                                     one, the transformation will be non-metric.
         """
         # Set the estimated start position to the current position of the drone if it's not already known.
-        if self.get_estimated_start_pos() is None:
-            self.set_estimated_start_pos(DroneController._extract_current_pos(tracker_c_t_i))
+        if self.get_expected_start_pos() is None:
+            self.set_expected_start_pos(DroneController._extract_current_pos(tracker_c_t_i))
 
         # TODO: Comment here.
         if type(self.__drone) is SimulatedDrone:
@@ -83,11 +83,11 @@ class TakeoffDroneController(DroneController):
     def render_ui(self) -> None:
         """Render the user interface for the controller."""
         # TODO: Comment here.
-        estimated_start_pos: Optional[np.ndarray] = self.get_estimated_start_pos()
-        estimated_end_pos: Optional[np.ndarray] = self.get_estimated_end_pos()
+        expected_start_pos: Optional[np.ndarray] = self.get_expected_start_pos()
+        expected_end_pos: Optional[np.ndarray] = self.get_expected_end_pos()
 
         # TODO: Comment here.
-        if estimated_start_pos is not None and estimated_end_pos is not None:
+        if expected_start_pos is not None and expected_end_pos is not None:
             # TODO: Comment here.
             glDepthMask(False)
 
@@ -98,7 +98,7 @@ class TakeoffDroneController(DroneController):
 
             # TODO: Comment here.
             glColor3f(0, 1, 0)
-            OpenGLUtil.render_cylinder(estimated_start_pos, estimated_end_pos, 0.11, 0.0, slices=10)
+            OpenGLUtil.render_cylinder(expected_start_pos, expected_end_pos, 0.11, 0.0, slices=10)
 
             # TODO: Comment here.
             glDisable(GL_BLEND)
