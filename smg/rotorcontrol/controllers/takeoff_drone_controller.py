@@ -30,12 +30,20 @@ class TakeoffDroneController(DroneController):
     # PUBLIC METHODS
 
     def get_expected_end_pos(self) -> Optional[np.ndarray]:
-        """TODO"""
+        """
+        Get the expected position of the drone once the controller has finished (if known).
+
+        :return:    The expected position of the drone once the controller has finished, if known, or None otherwise.
+        """
         # FIXME: Do this properly.
         return self.get_expected_start_pos() + np.array([0.0, -1.0, 0.0])
 
     def get_expected_end_state(self) -> Optional[Drone.EState]:
-        """TODO"""
+        """
+        Get the expected state of the drone once the controller has finished (if known).
+
+        :return:    The expected state of the drone once the controller has finished, if known, or None otherwise.
+        """
         return Drone.FLYING
 
     def has_finished(self) -> bool:

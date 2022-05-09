@@ -24,7 +24,7 @@ class LandingDroneController(DroneController):
         Construct a landing controller for a drone.
 
         :param drone:               The drone.
-        :param planning_toolkit:    TODO
+        :param planning_toolkit:    The planning toolkit (used for traversability checking).
         """
         super().__init__()
         self.__drone: Drone = drone
@@ -34,7 +34,11 @@ class LandingDroneController(DroneController):
     # PUBLIC METHODS
 
     def get_expected_end_pos(self) -> Optional[np.ndarray]:
-        """TODO"""
+        """
+        Get the expected position of the drone once the controller has finished (if known).
+
+        :return:    The expected position of the drone once the controller has finished, if known, or None otherwise.
+        """
         expected_start_pos: Optional[np.ndarray] = self.get_expected_start_pos()
 
         # TODO: Comment here.
@@ -54,8 +58,11 @@ class LandingDroneController(DroneController):
         return self.__expected_end_pos
 
     def get_expected_end_state(self) -> Optional[Drone.EState]:
-        """TODO"""
-        # FIXME: Do this properly.
+        """
+        Get the expected state of the drone once the controller has finished (if known).
+
+        :return:    The expected state of the drone once the controller has finished, if known, or None otherwise.
+        """
         return Drone.IDLE
 
     def has_finished(self) -> bool:
