@@ -129,6 +129,10 @@ class RTSStyleDroneController(DroneController):
                 active_inner_controller.terminate()
                 self.__inner_controllers.popleft()
 
+        # If no inner controllers are left in the queue, stop the drone.
+        if len(self.__inner_controllers) == 0:
+            self.__drone.stop()
+
     def render_ui(self) -> None:
         """Render the user interface for the controller."""
         # Render the user interfaces for the inner controllers.
