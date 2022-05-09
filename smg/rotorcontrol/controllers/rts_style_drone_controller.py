@@ -14,6 +14,7 @@ from smg.rotory.drones import Drone
 
 from .drone_controller import DroneController
 from .landing_drone_controller import LandingDroneController
+from .ppn_drone_controller import PPNDroneController
 from .takeoff_drone_controller import TakeoffDroneController
 from .traverse_waypoints_drone_controller import TraverseWaypointsDroneController
 
@@ -119,6 +120,13 @@ class RTSStyleDroneController(DroneController):
             # If the user scrolls the mouse wheel, change the desired offset of the goal position above the floor.
             elif event.type == pygame.MOUSEWHEEL:
                 self.__height_offset = np.clip(self.__height_offset + event.y * 0.2, 0.3, 3.0)
+
+            # FIXME: Temporary code.
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_p and self.__picker_pos is not None:
+                new_controller: PPNDroneController = PPNDroneController(drone=self.__drone)
+                new_controller.set_target_pos(self.__picker_pos)
+                self.__clear_inner_controllers()
+                self.__inner_controllers = deque([new_controller])
 
         # Delegate lower-level control of the drone to the active inner controller (if any). If the active controller
         # finishes, remove it from the queue and move on to the next one (if any).
