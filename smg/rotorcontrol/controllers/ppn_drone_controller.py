@@ -44,12 +44,50 @@ class PPNDroneController(DroneController):
         super().__init__()
 
         self.__drone: Drone = drone
+        self.__drone_pos: Optional[np.ndarray] = None
         self.__rd_old: Optional[np.ndarray] = None
         self.__speed: float = 0.5
         self.__t_old: Optional[float] = None
         self.__target_pos: Optional[np.ndarray] = None
 
     # PUBLIC METHODS
+
+    def get_expected_end_pos(self) -> Optional[np.ndarray]:
+        """
+        Get the expected position of the drone once the controller has finished (if known).
+
+        :return:    The expected position of the drone once the controller has finished, if known, or None otherwise.
+        """
+        # FIXME: Do this properly.
+        expected_start_pos: Optional[np.ndarray] = self.get_expected_start_pos()
+        if expected_start_pos is not None and self.__target_pos is not None:
+            return np.array([self.__target_pos[0], expected_start_pos[1], self.__target_pos[2]])
+        else:
+            return None
+
+    def get_expected_end_state(self) -> Optional[Drone.EState]:
+        """
+        Get the expected state of the drone once the controller has finished (if known).
+
+        :return:    The expected state of the drone once the controller has finished, if known, or None otherwise.
+        """
+        return Drone.FLYING
+
+    def has_finished(self) -> bool:
+        """
+        Get whether or not the controller has finished.
+
+        :return:    True, if the controller has finished, or False otherwise.
+        """
+        # FIXME: Do this properly.
+        if self.__target_pos is None:
+            return True
+        elif self.__drone_pos is not None:
+            rd: np.ndarray = self.__target_pos - self.__drone_pos
+            rd[1] = 0.0
+            return np.linalg.norm(rd) < 0.025
+        else:
+            return False
 
     def iterate(self, *, altitude: Optional[float] = None, events: Optional[List[pygame.event.Event]] = None,
                 image: np.ndarray, image_timestamp: Optional[float] = None,
@@ -78,15 +116,19 @@ class PPNDroneController(DroneController):
             raise RuntimeError("Error: Tracker poses must be provided when using 'PPN' control")
 
         # TODO: Comment here.
-        if self.__target_pos is None:
+        if self.has_finished():
             self.__drone.stop()
             return
 
         # TODO: Comment here.
-        drone_pos: np.ndarray = DroneController._extract_current_pos(tracker_c_t_i)
+        self.__drone_pos = DroneController._extract_current_pos(tracker_c_t_i)
+
+        # Set the estimated start position to the current position of the drone if it's not already known.
+        if self.get_expected_start_pos() is None:
+            self.set_expected_start_pos(self.__drone_pos.copy())
 
         # TODO: Comment here.
-        rd: np.ndarray = self.__target_pos - drone_pos
+        rd: np.ndarray = self.__target_pos - self.__drone_pos
         rd[1] = 0.0
 
         # TODO: Comment here.
@@ -100,7 +142,7 @@ class PPNDroneController(DroneController):
                 np.linalg.norm(cp) / (np.linalg.norm(self.__rd_old) * np.linalg.norm(rd)) / (t - self.__t_old)
             rate: float = sign * rad_per_s_to_rate(rad_per_s, t - self.__t_old)
             n: float = 1.5
-            print(self.__target_pos, drone_pos, rd, self.__rd_old, cp, sign, rad_per_s, t - self.__t_old, rate)
+            # print(self.__target_pos, self.__drone_pos, rd, self.__rd_old, cp, sign, rad_per_s, t - self.__t_old, rate)
             self.__drone.move_forward(self.__speed)
             self.__drone.turn(n * rate)
 
@@ -109,6 +151,7 @@ class PPNDroneController(DroneController):
 
     def reset(self) -> None:
         """Reset the controller."""
+        self.__drone_pos = None
         self.__rd_old = None
         self.__t_old = None
         self.__target_pos = None
