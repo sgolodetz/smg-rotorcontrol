@@ -22,6 +22,7 @@ class KeyboardDroneController(DroneController):
 
         :param drone:   The drone.
         """
+        super().__init__()
         self.__drone: Drone = drone
 
     # PUBLIC METHODS
@@ -38,9 +39,10 @@ class KeyboardDroneController(DroneController):
         :param image:               The most recent image from the drone.
         :param image_timestamp:     The timestamp of the most recent image from the drone (optional).
         :param intrinsics:          The intrinsics of the drone's camera.
-        :param tracker_c_t_i:       A transformation from initial camera space to current camera space, as estimated
-                                    by any tracker that's running (optional). Note that if the tracker is a monocular
-                                    one, the transformation will be non-metric.
+        :param tracker_c_t_i:       The 6D pose of the drone, expressed as a 4x4 matrix representing a transformation
+                                    from initial camera space to current camera space, as estimated by any tracker that
+                                    is running (optional). Note that if the tracker is monocular, the transformation is
+                                    unlikely to be scale-correct.
         """
         # If no PyGame events were passed in, use an empty list of events as the default.
         if events is None:

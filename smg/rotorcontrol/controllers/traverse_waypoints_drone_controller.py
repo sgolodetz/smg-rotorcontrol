@@ -7,10 +7,12 @@ import threading
 import time
 import vg
 
+from OpenGL.GL import *
 from timeit import default_timer as timer
-from typing import Callable, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from smg.navigation import AStarPathPlanner, Path, PlanningToolkit
+from smg.opengl import OpenGLUtil
 from smg.rigging.cameras import SimpleCamera
 from smg.rigging.helpers import CameraPoseConverter
 from smg.rotory.drones import Drone
@@ -36,6 +38,8 @@ class TraverseWaypointsDroneController(DroneController):
         :param drone:               The drone.
         :param planning_toolkit:    The planning toolkit (used for path planning).
         """
+        super().__init__()
+
         self.__alive: bool = False
 
         self.__ay: float = 10
@@ -84,27 +88,45 @@ class TraverseWaypointsDroneController(DroneController):
         with self.__lock:
             return self.__current_pos.copy() if self.__current_pos is not None else None
 
+    def get_expected_end_pos(self) -> Optional[np.ndarray]:
+        """
+        Get the expected position of the drone once the controller has finished (if known).
+
+        :return:    The expected position of the drone once the controller has finished, if known, or None otherwise.
+        """
+        waypoints: List[np.ndarray] = self.get_waypoints()
+        return waypoints[-1] if len(waypoints) > 0 else None
+
+    def get_expected_end_state(self) -> Optional[Drone.EState]:
+        """
+        Get the expected state of the drone once the controller has finished (if known).
+
+        :return:    The expected state of the drone once the controller has finished, if known, or None otherwise.
+        """
+        return Drone.FLYING
+
     def get_new_waypoints(self) -> List[np.ndarray]:
         """Get any new (i.e. as yet unplanned) waypoints that the drone should traverse."""
         with self.__lock:
             return self.__waypoints[-self.__new_waypoint_count:] if self.__new_waypoint_count > 0 else []
 
-    def get_occupancy_colourer(self) -> Callable[[np.ndarray], np.ndarray]:
-        """Get a function that can be used to colour waypoints on a path based on their occupancy status."""
-        return self.__planning_toolkit.occupancy_colourer()
-
     def get_path(self) -> Optional[Path]:
         """Get a copy of the path (if any), or None otherwise."""
         return self.__path.copy() if self.__path is not None else None
-
-    def get_planning_toolkit(self) -> PlanningToolkit:
-        """Get the planning toolkit that is being used."""
-        return self.__planning_toolkit
 
     def get_waypoints(self) -> List[np.ndarray]:
         """Get the waypoints that the drone should traverse."""
         with self.__lock:
             return self.__waypoints.copy()
+
+    def has_finished(self) -> bool:
+        """
+        Get whether or not the controller has finished.
+
+        :return:    True, if the controller has finished, or False otherwise.
+        """
+        with self.__lock:
+            return len(self.__waypoints) == 0
 
     def iterate(self, *, altitude: Optional[float] = None, events: Optional[List[pygame.event.Event]] = None,
                 image: np.ndarray, image_timestamp: Optional[float] = None,
@@ -123,9 +145,10 @@ class TraverseWaypointsDroneController(DroneController):
         :param image:               The most recent image from the drone.
         :param image_timestamp:     The timestamp of the most recent image from the drone (optional).
         :param intrinsics:          The intrinsics of the drone's camera.
-        :param tracker_c_t_i:       A transformation from initial camera space to current camera space, as estimated
-                                    by any tracker that's running (optional). Note that if the tracker is a monocular
-                                    one, the transformation will be non-metric.
+        :param tracker_c_t_i:       The 6D pose of the drone, expressed as a 4x4 matrix representing a transformation
+                                    from initial camera space to current camera space, as estimated by any tracker that
+                                    is running (optional). Note that if the tracker is monocular, the transformation is
+                                    unlikely to be scale-correct.
         """
         # If no tracker pose has been passed in, raise an exception and early out.
         if tracker_c_t_i is None:
@@ -141,11 +164,16 @@ class TraverseWaypointsDroneController(DroneController):
                     self.__movement_allowed = not self.__movement_allowed
 
         with self.__lock:
-            # Extract the current position of the drone from the tracker pose provided.
-            tracker_i_t_c: np.ndarray = np.linalg.inv(tracker_c_t_i)
-            self.__current_pos: np.ndarray = tracker_i_t_c[0:3, 3].copy()
+            # --- Step 2: Update the drone's current position, and ensure its estimated start position is set ---#
 
-            # --- Step 2: Trigger Path Planning (if required) ---#
+            # Extract the current position of the drone from the tracker pose provided.
+            self.__current_pos: np.ndarray = DroneController._extract_current_pos(tracker_c_t_i)
+
+            # Set the estimated start position to the current position of the drone if it's not already known.
+            if self.get_expected_start_pos() is None:
+                self.set_expected_start_pos(self.__current_pos.copy())
+
+            # --- Step 3: Trigger Path Planning (if required) ---#
 
             # If there are any waypoints through which a path has not yet been planned, tell the path planner
             # that some path planning is needed.
@@ -153,7 +181,7 @@ class TraverseWaypointsDroneController(DroneController):
                 self.__planning_is_needed = True
                 self.__planning_needed.notify()
 
-            # --- Step 3: Update Current Path --- #
+            # --- Step 4: Update Current Path --- #
 
             # If there's a current path, update it based on the drone's current position.
             if self.__path is not None:
@@ -190,7 +218,7 @@ class TraverseWaypointsDroneController(DroneController):
                     # noinspection PyUnboundLocalVariable
                     print(f"Path Updating: {end - start}s")
 
-            # --- Step 4: Make Drone Follow Current Path --- #
+            # --- Step 5: Make Drone Follow Current Path --- #
 
             # A flag indicating whether or not the drone should stop moving. This will be set to False if any reason
             # is found for the drone to continue moving.
@@ -244,6 +272,39 @@ class TraverseWaypointsDroneController(DroneController):
             # If the drone should stop moving, stop it.
             if stop_drone:
                 self.__drone.stop()
+
+    def render_ui(self) -> None:
+        """Render the user interface for the controller."""
+        # Render the path that the drone is following (if any).
+        path: Optional[Path] = self.get_path()
+        if path is not None:
+            path.render(
+                start_colour=(0, 1, 1), end_colour=(0, 1, 1), width=5,
+                waypoint_colourer=self.__planning_toolkit.occupancy_colourer()
+            )
+
+        # Render any new waypoints for which a path has not yet been planned.
+        # FIXME: This is currently a bit messy - it needs tidying up and moving somewhere more sensible.
+        glColor3f(1, 1, 0)
+
+        new_waypoints: List[np.ndarray] = self.get_new_waypoints()
+        waypoints: List[np.ndarray] = self.get_waypoints()
+        last_waypoint: Optional[np.ndarray] = self.get_current_pos()
+        if last_waypoint is None:
+            last_waypoint = self.get_expected_start_pos()
+        if path is not None and len(new_waypoints) != len(waypoints):
+            last_waypoint = path[-1].position
+
+        if last_waypoint is not None:
+            glLineWidth(5)
+            for i in range(len(new_waypoints)):
+                OpenGLUtil.render_sphere(new_waypoints[i], 0.1, slices=10, stacks=10)
+                glBegin(GL_LINES)
+                glVertex3f(*last_waypoint)
+                glVertex3f(*new_waypoints[i])
+                glEnd()
+                last_waypoint = new_waypoints[i]
+            glLineWidth(1)
 
     def set_waypoints(self, waypoints: List[np.ndarray]) -> None:
         """
