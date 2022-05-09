@@ -39,19 +39,23 @@ class LandingDroneController(DroneController):
 
         :return:    The expected position of the drone once the controller has finished, if known, or None otherwise.
         """
+        # Get the expected start position of the drone (if known).
         expected_start_pos: Optional[np.ndarray] = self.get_expected_start_pos()
 
-        # TODO: Comment here.
+        # If the expected start position is known, and we haven't yet calculated the expected end position:
         if expected_start_pos is not None and self.__expected_end_pos is None:
-            # TODO: Comment here.
+            # Try to find a patch of flat ground below the current position of the drone.
             ground_vpos: Optional[np.ndarray] = self.__planning_toolkit.find_flat_ground_below(expected_start_pos)
 
-            # TODO: Comment here.
+            # If that succeeded, set the expected end position to one voxel above the centre of the patch.
             if ground_vpos is not None:
                 resolution: float = self.__planning_toolkit.get_tree().get_resolution()
                 self.__expected_end_pos = ground_vpos + np.array([0.0, -resolution, 0.0])
 
-            # TODO: Comment here.
+            # Otherwise, set the expected end position to be equal to the expected start position. One rationale
+            # for this is that the controller will end up doing nothing, and so the drone won't move as a result.
+            # A separate rationale is that we don't want the controller to keep trying to calculate the expected
+            # end position repeatedly (which would happen if we don't set it to something).
             else:
                 self.__expected_end_pos = expected_start_pos
 
@@ -71,12 +75,10 @@ class LandingDroneController(DroneController):
 
         :return:    True, if the controller has finished, or False otherwise.
         """
-        if type(self.__drone) is SimulatedDrone:
-            simulated_drone: SimulatedDrone = cast(SimulatedDrone, self.__drone)
-            return simulated_drone.get_state() == Drone.IDLE
-        else:
-            # TODO: We still need to make this work for real drones.
-            return False
+        # Note: If the drone state is unknown, we can't actually determine whether the controller has finished or not,
+        #       so we simply assume that it hasn't.
+        drone_state: Optional[Drone.EState] = self.__drone.get_state()
+        return drone_state is not None and drone_state == Drone.IDLE
 
     def iterate(self, *, altitude: Optional[float] = None, events: Optional[List[pygame.event.Event]] = None,
                 image: np.ndarray, image_timestamp: Optional[float] = None,
