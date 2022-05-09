@@ -12,12 +12,17 @@ from smg.rotory.drones import Drone
 from .drone_controller import DroneController
 
 
-# FIXME: Temporary code.
-def rad_per_s_to_rate(rad_per_s: float) -> float:
-    if rad_per_s <= 0.526913819:
-        return (-0.5211 + np.sqrt(0.2937691266672 + 5.8512 * rad_per_s)) / 2.9256
-    else:
-        return (rad_per_s + 0.306576181) / 1.8522
+# FIXME: Temporary code (Tello version).
+# def rad_per_s_to_rate(rad_per_s: float) -> float:
+#     if rad_per_s <= 0.526913819:
+#         return (-0.5211 + np.sqrt(0.2937691266672 + 5.8512 * rad_per_s)) / 2.9256
+#     else:
+#         return (rad_per_s + 0.306576181) / 1.8522
+
+# FIXME: Temporary code (simulated drone version).
+def rad_per_s_to_rate(rad_per_s: float, t_diff: float) -> float:
+    angular_gain: float = 0.02
+    return rad_per_s * t_diff / angular_gain
 
 
 class PPNDroneController(DroneController):
@@ -93,9 +98,9 @@ class PPNDroneController(DroneController):
             sign: int = -1 if np.dot(cp, np.array([0, -1, 0])) >= 0 else 1
             rad_per_s: float = \
                 np.linalg.norm(cp) / (np.linalg.norm(self.__rd_old) * np.linalg.norm(rd)) / (t - self.__t_old)
-            rate: float = sign * rad_per_s_to_rate(rad_per_s)
-            n: float = 3.0
-            print(self.__target_pos, drone_pos, rd, self.__rd_old, cp, sign, rate)
+            rate: float = sign * rad_per_s_to_rate(rad_per_s, t - self.__t_old)
+            n: float = 1.5
+            print(self.__target_pos, drone_pos, rd, self.__rd_old, cp, sign, rad_per_s, t - self.__t_old, rate)
             self.__drone.move_forward(self.__speed)
             self.__drone.turn(n * rate)
 
