@@ -55,7 +55,7 @@ class LandingDroneController(DroneController):
             # Otherwise, set the expected end position to be equal to the expected start position. One rationale
             # for this is that the controller will end up doing nothing, and so the drone won't move as a result.
             # A separate rationale is that we don't want the controller to keep trying to calculate the expected
-            # end position repeatedly (which would happen if we don't set it to something).
+            # end position repeatedly (which would happen if we didn't set it to something).
             else:
                 self.__expected_end_pos = expected_start_pos
 
@@ -101,37 +101,38 @@ class LandingDroneController(DroneController):
         if self.get_expected_start_pos() is None:
             self.set_expected_start_pos(DroneController._extract_current_pos(tracker_c_t_i))
 
-        # TODO: Comment here.
-        if type(self.__drone) is SimulatedDrone:
-            simulated_drone: SimulatedDrone = cast(SimulatedDrone, self.__drone)
-            if simulated_drone.get_state() == Drone.FLYING:
-                self.__drone.land()
-        else:
-            # TODO: We still need to make this work for real drones.
-            pass
+        # If the drone's known to be in the 'flying' state, ask it to land. Note that this will only be called once,
+        # since once the drone has been asked to land, it will transition to the 'landing' state. Note also that if
+        # the state of the drone can't be determined for some reason, this will do nothing.
+        drone_state: Optional[Drone.EState] = self.__drone.get_state()
+        if drone_state is not None and drone_state == Drone.FLYING:
+            self.__drone.land()
 
     def render_ui(self) -> None:
         """Render the user interface for the controller."""
-        # TODO: Comment here.
+        # Get the expected start and end positions for the controller. If either is unknown, early out.
         expected_start_pos: Optional[np.ndarray] = self.get_expected_start_pos()
         expected_end_pos: Optional[np.ndarray] = self.get_expected_end_pos()
+        if expected_start_pos is None or expected_end_pos is None:
+            return
 
-        # TODO: Comment here.
-        if expected_start_pos is not None and expected_end_pos is not None:
-            # TODO: Comment here.
-            glDepthMask(False)
+        # Disable writing to the depth buffer. (This is to avoid the drone being blocked by the landing cone.)
+        glDepthMask(False)
 
-            # TODO: Comment here.
-            glEnable(GL_BLEND)
-            glBlendColor(0.5, 0.5, 0.5, 0.5)
-            glBlendFunc(GL_CONSTANT_COLOR, GL_ONE_MINUS_CONSTANT_COLOR)
+        # Enable blending.
+        glEnable(GL_BLEND)
+        glBlendColor(0.5, 0.5, 0.5, 0.5)
+        glBlendFunc(GL_CONSTANT_COLOR, GL_ONE_MINUS_CONSTANT_COLOR)
 
-            # TODO: Comment here.
-            glColor3f(1, 0, 0)
-            OpenGLUtil.render_cylinder(expected_start_pos, expected_end_pos, 0.11, 0.0, slices=10)
+        # Render a red, downwards-pointing cone to indicate the landing. Note that the base radius of 0.11m
+        # is set to be ever so slightly larger than the radius of the spheres used to render new waypoints
+        # on paths (see the 'traverse waypoints' drone controller). This avoids the depth fighting that
+        # would occur if the same radius was used for both.
+        glColor3f(1, 0, 0)
+        OpenGLUtil.render_cylinder(expected_start_pos, expected_end_pos, 0.11, 0.0, slices=10)
 
-            # TODO: Comment here.
-            glDisable(GL_BLEND)
+        # Disable blending again.
+        glDisable(GL_BLEND)
 
-            # TODO: Comment here.
-            glDepthMask(True)
+        # Enable writing to the depth buffer again.
+        glDepthMask(True)

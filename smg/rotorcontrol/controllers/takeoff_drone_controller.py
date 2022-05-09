@@ -91,26 +91,29 @@ class TakeoffDroneController(DroneController):
 
     def render_ui(self) -> None:
         """Render the user interface for the controller."""
-        # TODO: Comment here.
+        # Get the expected start and end positions for the controller. If either is unknown, early out.
         expected_start_pos: Optional[np.ndarray] = self.get_expected_start_pos()
         expected_end_pos: Optional[np.ndarray] = self.get_expected_end_pos()
+        if expected_start_pos is None or expected_end_pos is None:
+            return
 
-        # TODO: Comment here.
-        if expected_start_pos is not None and expected_end_pos is not None:
-            # TODO: Comment here.
-            glDepthMask(False)
+            # Disable writing to the depth buffer. (This is to avoid the drone being blocked by the takeoff cone.)
+        glDepthMask(False)
 
-            # TODO: Comment here.
-            glEnable(GL_BLEND)
-            glBlendColor(0.5, 0.5, 0.5, 0.5)
-            glBlendFunc(GL_CONSTANT_COLOR, GL_ONE_MINUS_CONSTANT_COLOR)
+        # Enable blending.
+        glEnable(GL_BLEND)
+        glBlendColor(0.5, 0.5, 0.5, 0.5)
+        glBlendFunc(GL_CONSTANT_COLOR, GL_ONE_MINUS_CONSTANT_COLOR)
 
-            # TODO: Comment here.
-            glColor3f(0, 1, 0)
-            OpenGLUtil.render_cylinder(expected_start_pos, expected_end_pos, 0.11, 0.0, slices=10)
+        # Render a green, upwards-pointing cone to indicate the takeoff. Note that the base radius of 0.11m
+        # is set to be ever so slightly larger than the radius of the spheres used to render new waypoints
+        # on paths (see the 'traverse waypoints' drone controller). This avoids the depth fighting that
+        # would occur if the same radius was used for both.
+        glColor3f(0, 1, 0)
+        OpenGLUtil.render_cylinder(expected_start_pos, expected_end_pos, 0.11, 0.0, slices=10)
 
-            # TODO: Comment here.
-            glDisable(GL_BLEND)
+        # Disable blending again.
+        glDisable(GL_BLEND)
 
-            # TODO: Comment here.
-            glDepthMask(True)
+        # Enable writing to the depth buffer again.
+        glDepthMask(True)
