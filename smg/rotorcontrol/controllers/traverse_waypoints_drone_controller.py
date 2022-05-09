@@ -89,12 +89,20 @@ class TraverseWaypointsDroneController(DroneController):
             return self.__current_pos.copy() if self.__current_pos is not None else None
 
     def get_expected_end_pos(self) -> Optional[np.ndarray]:
-        """TODO"""
+        """
+        Get the expected position of the drone once the controller has finished (if known).
+
+        :return:    The expected position of the drone once the controller has finished, if known, or None otherwise.
+        """
         waypoints: List[np.ndarray] = self.get_waypoints()
         return waypoints[-1] if len(waypoints) > 0 else None
 
     def get_expected_end_state(self) -> Optional[Drone.EState]:
-        """TODO"""
+        """
+        Get the expected state of the drone once the controller has finished (if known).
+
+        :return:    The expected state of the drone once the controller has finished, if known, or None otherwise.
+        """
         return Drone.FLYING
 
     def get_new_waypoints(self) -> List[np.ndarray]:
