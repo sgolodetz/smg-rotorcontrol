@@ -5,11 +5,11 @@ os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame
 
 from OpenGL.GL import *
-from typing import cast, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from smg.navigation import PlanningToolkit
 from smg.opengl import OpenGLUtil
-from smg.rotory.drones import Drone, SimulatedDrone
+from smg.rotory.drones import Drone
 
 from .drone_controller import DroneController
 
@@ -124,10 +124,10 @@ class LandingDroneController(DroneController):
         glBlendColor(0.5, 0.5, 0.5, 0.5)
         glBlendFunc(GL_CONSTANT_COLOR, GL_ONE_MINUS_CONSTANT_COLOR)
 
-        # Render a red, downwards-pointing cone to indicate the landing. Note that the base radius of 0.11m
-        # is set to be ever so slightly larger than the radius of the spheres used to render new waypoints
-        # on paths (see the 'traverse waypoints' drone controller). This avoids the depth fighting that
-        # would occur if the same radius was used for both.
+        # Render a red, downwards-pointing cone to indicate the landing. Note that the base radius of 0.11m is set
+        # to be ever so slightly larger than the radius of the spheres used to render new waypoints on paths (see
+        # the 'traverse waypoints' drone controller). This avoids the depth fighting that would occur if the same
+        # radius was used for both.
         glColor3f(1, 0, 0)
         OpenGLUtil.render_cylinder(expected_start_pos, expected_end_pos, 0.11, 0.0, slices=10)
 

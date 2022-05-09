@@ -5,10 +5,10 @@ os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame
 
 from OpenGL.GL import *
-from typing import cast, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from smg.opengl import OpenGLUtil
-from smg.rotory.drones import Drone, SimulatedDrone
+from smg.rotory.drones import Drone
 
 from .drone_controller import DroneController
 
@@ -35,8 +35,11 @@ class TakeoffDroneController(DroneController):
 
         :return:    The expected position of the drone once the controller has finished, if known, or None otherwise.
         """
-        # FIXME: Do this properly.
-        return self.get_expected_start_pos() + np.array([0.0, -1.0, 0.0])
+        expected_takeoff_height: Optional[float] = self.__drone.get_expected_takeoff_height()
+        if expected_takeoff_height is None:
+            expected_takeoff_height = 1.0
+
+        return self.get_expected_start_pos() + np.array([0.0, -expected_takeoff_height, 0.0])
 
     def get_expected_end_state(self) -> Optional[Drone.EState]:
         """
@@ -52,12 +55,10 @@ class TakeoffDroneController(DroneController):
 
         :return:    True, if the controller has finished, or False otherwise.
         """
-        if type(self.__drone) is SimulatedDrone:
-            simulated_drone: SimulatedDrone = cast(SimulatedDrone, self.__drone)
-            return simulated_drone.get_state() == Drone.FLYING
-        else:
-            # TODO: We still need to make this work for real drones.
-            return False
+        # Note: If the drone state is unknown, we can't actually determine whether the controller has finished or not,
+        #       so we simply assume that it hasn't.
+        drone_state: Optional[Drone.EState] = self.__drone.get_state()
+        return drone_state is not None and drone_state == Drone.FLYING
 
     def iterate(self, *, altitude: Optional[float] = None, events: Optional[List[pygame.event.Event]] = None,
                 image: np.ndarray, image_timestamp: Optional[float] = None,
@@ -80,14 +81,12 @@ class TakeoffDroneController(DroneController):
         if self.get_expected_start_pos() is None:
             self.set_expected_start_pos(DroneController._extract_current_pos(tracker_c_t_i))
 
-        # TODO: Comment here.
-        if type(self.__drone) is SimulatedDrone:
-            simulated_drone: SimulatedDrone = cast(SimulatedDrone, self.__drone)
-            if simulated_drone.get_state() == Drone.IDLE:
-                self.__drone.takeoff()
-        else:
-            # TODO: We still need to make this work for real drones.
-            pass
+        # If the drone's known to be in the 'idle' state, ask it to take off. Note that this will only be called once,
+        # since once the drone has been asked to take off, it will transition to the 'taking off' state. Note also that
+        # if the state of the drone can't be determined for some reason, this will do nothing.
+        drone_state: Optional[Drone.EState] = self.__drone.get_state()
+        if drone_state is not None and drone_state == Drone.IDLE:
+            self.__drone.takeoff()
 
     def render_ui(self) -> None:
         """Render the user interface for the controller."""
@@ -97,7 +96,7 @@ class TakeoffDroneController(DroneController):
         if expected_start_pos is None or expected_end_pos is None:
             return
 
-            # Disable writing to the depth buffer. (This is to avoid the drone being blocked by the takeoff cone.)
+        # Disable writing to the depth buffer. (This is to avoid the drone being blocked by the takeoff cone.)
         glDepthMask(False)
 
         # Enable blending.
@@ -105,10 +104,10 @@ class TakeoffDroneController(DroneController):
         glBlendColor(0.5, 0.5, 0.5, 0.5)
         glBlendFunc(GL_CONSTANT_COLOR, GL_ONE_MINUS_CONSTANT_COLOR)
 
-        # Render a green, upwards-pointing cone to indicate the takeoff. Note that the base radius of 0.11m
-        # is set to be ever so slightly larger than the radius of the spheres used to render new waypoints
-        # on paths (see the 'traverse waypoints' drone controller). This avoids the depth fighting that
-        # would occur if the same radius was used for both.
+        # Render a green, upwards-pointing cone to indicate the takeoff. Note that the base radius of 0.11m is set
+        # to be ever so slightly larger than the radius of the spheres used to render new waypoints on paths (see
+        # the 'traverse waypoints' drone controller). This avoids the depth fighting that would occur if the same
+        # radius was used for both.
         glColor3f(0, 1, 0)
         OpenGLUtil.render_cylinder(expected_start_pos, expected_end_pos, 0.11, 0.0, slices=10)
 
