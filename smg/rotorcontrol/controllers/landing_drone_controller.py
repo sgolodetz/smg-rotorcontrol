@@ -83,9 +83,10 @@ class LandingDroneController(DroneController):
         :param image:               The most recent image from the drone.
         :param image_timestamp:     The timestamp of the most recent image from the drone (optional).
         :param intrinsics:          The intrinsics of the drone's camera.
-        :param tracker_c_t_i:       A transformation from initial camera space to current camera space, as estimated
-                                    by any tracker that's running (optional). Note that if the tracker is a monocular
-                                    one, the transformation will be non-metric.
+        :param tracker_c_t_i:       The 6D pose of the drone, expressed as a 4x4 matrix representing a transformation
+                                    from initial camera space to current camera space, as estimated by any tracker that
+                                    is running (optional). Note that if the tracker is monocular, the transformation is
+                                    unlikely to be scale-correct.
         """
         # Set the estimated start position to the current position of the drone if it's not already known.
         if self.get_expected_start_pos() is None:
