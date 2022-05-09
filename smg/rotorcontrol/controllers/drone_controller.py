@@ -44,16 +44,28 @@ class DroneController(ABC):
 
     # noinspection PyMethodMayBeStatic
     def get_expected_end_pos(self) -> Optional[np.ndarray]:
-        """TODO"""
+        """
+        Get the expected position of the drone once the controller has finished (if known).
+
+        :return:    The expected position of the drone once the controller has finished, if known, or None otherwise.
+        """
         return None
 
     # noinspection PyMethodMayBeStatic
     def get_expected_end_state(self) -> Optional[Drone.EState]:
-        """TODO"""
+        """
+        Get the expected state of the drone once the controller has finished (if known).
+
+        :return:    The expected state of the drone once the controller has finished, if known, or None otherwise.
+        """
         return None
 
     def get_expected_start_pos(self) -> Optional[np.ndarray]:
-        """TODO"""
+        """
+        Get the expected position of the drone when the controller starts (if known).
+
+        :return:    The expected position of the drone when the controller starts, if known, or None otherwise.
+        """
         return self.__expected_start_pos
 
     # noinspection PyMethodMayBeStatic
@@ -71,9 +83,12 @@ class DroneController(ABC):
 
     def set_expected_start_pos(self, expected_start_pos: Optional[np.ndarray]) -> None:
         """
-        TODO
+        Set the expected position of the drone when the controller starts (if known).
 
-        :param expected_start_pos:  TODO
+        .. note:
+            It's possible to pass in None here, indicating that the expected start position is unknown.
+
+        :param expected_start_pos:  The expected position of the drone when the controller starts (if known).
         """
         self.__expected_start_pos = expected_start_pos
 
@@ -86,10 +101,11 @@ class DroneController(ABC):
     @staticmethod
     def _extract_current_pos(tracker_c_t_i: np.ndarray) -> np.ndarray:
         """
-        TODO
+        Extract the current position of the drone from its pose.
 
-        :param tracker_c_t_i:   TODO
-        :return:                TODO
+        :param tracker_c_t_i:   The 6D pose of the drone, expressed as a 4x4 matrix representing a transformation
+                                from initial camera space to current camera space.
+        :return:                The current position of the drone (in initial camera space).
         """
         tracker_i_t_c: np.ndarray = np.linalg.inv(tracker_c_t_i)
         return tracker_i_t_c[0:3, 3].copy()
