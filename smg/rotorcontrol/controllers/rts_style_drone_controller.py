@@ -102,8 +102,8 @@ class RTSStyleDroneController(DroneController):
 
         # Process any PyGame events that have happened since the last iteration.
         for event in events:
-            # If the user is clicking a mouse button:
-            if event.type == pygame.MOUSEBUTTONDOWN:
+            # If the user is pressing a key or clicking a mouse button:
+            if event.type == pygame.KEYDOWN or event.type == pygame.MOUSEBUTTONDOWN:
                 # If the user is currently pressing one of the shift keys (indicating that an append is desired),
                 # and the last inner controller is not None (indicating that an append is possible):
                 last_inner_controller: Optional[DroneController] = self.__get_last_inner_controller()
@@ -120,13 +120,6 @@ class RTSStyleDroneController(DroneController):
             # If the user scrolls the mouse wheel, change the desired offset of the goal position above the floor.
             elif event.type == pygame.MOUSEWHEEL:
                 self.__height_offset = np.clip(self.__height_offset + event.y * 0.2, 0.3, 3.0)
-
-            # FIXME: Temporary code.
-            elif event.type == pygame.KEYDOWN and event.key == pygame.K_p and self.__picker_pos is not None:
-                new_controller: PPNDroneController = PPNDroneController(drone=self.__drone)
-                new_controller.set_target_pos(self.__picker_pos)
-                self.__clear_inner_controllers()
-                self.__inner_controllers = deque([new_controller])
 
         # Delegate lower-level control of the drone to the active inner controller (if any). If the active controller
         # finishes, remove it from the queue and move on to the next one (if any).
@@ -223,7 +216,7 @@ class RTSStyleDroneController(DroneController):
         new_controller: Optional[DroneController] = None
 
         # If the user is clicking the left mouse button, and a goal position has been determined:
-        if event.button == 1 and self.__goal_pos is not None:
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.__goal_pos is not None:
             # If the expected drone state once the previous controller finishes is either unknown or 'flying':
             if expected_drone_state is None or expected_drone_state == Drone.FLYING:
                 # If the last inner controller is a traverse waypoints controller, reuse it, else construct a new one.
@@ -243,7 +236,7 @@ class RTSStyleDroneController(DroneController):
                 traverse_waypoints_controller.append_waypoints([self.__goal_pos])
 
         # Otherwise, if the user is clicking the right mouse button:
-        elif event.button == 3:
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
             # If either the expected drone state when the previous controller finishes is known to be 'flying',
             # or the expected drone state is unknown and one of the Ctrl keys is being pressed:
             if (expected_drone_state is not None and expected_drone_state == Drone.FLYING) or (
@@ -262,6 +255,15 @@ class RTSStyleDroneController(DroneController):
             elif expected_drone_state is None or expected_drone_state == Drone.IDLE:
                 # Make a new takeoff controller.
                 new_controller = TakeoffDroneController(drone=self.__drone)
+
+                # Otherwise, if the user is pressing the 'p' key, and a goal position has been determined:
+        elif event.type == pygame.KEYDOWN and event.key == pygame.K_p and self.__goal_pos is not None:
+            # If the expected drone state is either unknown or 'flying':
+            if expected_drone_state is None or expected_drone_state == Drone.FLYING:
+                # Make a new pure proportional navigation controller.
+                ppn_controller: PPNDroneController = PPNDroneController(drone=self.__drone)
+                ppn_controller.set_target_pos(self.__goal_pos)
+                new_controller = ppn_controller
 
         # If a new controller has been constructed:
         if new_controller is not None:
@@ -282,7 +284,7 @@ class RTSStyleDroneController(DroneController):
         new_controller: Optional[DroneController] = None
 
         # If the user is clicking the left mouse button, and a goal position has been determined:
-        if event.button == 1 and self.__goal_pos is not None:
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.__goal_pos is not None:
             # If the current drone state is either unknown or 'flying':
             if drone_state is None or drone_state == Drone.FLYING:
                 # Make a traverse waypoints controller and set its list of waypoints to be a singleton list
@@ -295,7 +297,7 @@ class RTSStyleDroneController(DroneController):
                 new_controller = traverse_waypoints_controller
 
         # Otherwise, if the user is clicking the right mouse button:
-        elif event.button == 3:
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
             # If either the current drone state is known to be 'flying', or it's unknown and one of the Ctrl keys
             # is being pressed:
             if (drone_state is not None and drone_state == Drone.FLYING) or (
@@ -312,6 +314,15 @@ class RTSStyleDroneController(DroneController):
             elif drone_state is None or drone_state == Drone.IDLE:
                 # Make a new takeoff controller.
                 new_controller = TakeoffDroneController(drone=self.__drone)
+
+        # Otherwise, if the user is pressing the 'p' key, and a goal position has been determined:
+        elif event.type == pygame.KEYDOWN and event.key == pygame.K_p and self.__goal_pos is not None:
+            # If the current drone state is either unknown or 'flying':
+            if drone_state is None or drone_state == Drone.FLYING:
+                # Make a new pure proportional navigation controller.
+                ppn_controller: PPNDroneController = PPNDroneController(drone=self.__drone)
+                ppn_controller.set_target_pos(self.__goal_pos)
+                new_controller = ppn_controller
 
         # If a new controller has been constructed:
         if new_controller is not None:
