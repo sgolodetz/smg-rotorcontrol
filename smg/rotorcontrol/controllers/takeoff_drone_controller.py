@@ -35,11 +35,15 @@ class TakeoffDroneController(DroneController):
 
         :return:    The expected position of the drone once the controller has finished, if known, or None otherwise.
         """
+        expected_start_pos: Optional[np.ndarray] = self.get_expected_start_pos()
+        if expected_start_pos is None:
+            return None
+
         expected_takeoff_height: Optional[float] = self.__drone.get_expected_takeoff_height()
         if expected_takeoff_height is None:
             expected_takeoff_height = 1.0
 
-        return self.get_expected_start_pos() + np.array([0.0, -expected_takeoff_height, 0.0])
+        return expected_start_pos + np.array([0.0, -expected_takeoff_height, 0.0])
 
     def get_expected_end_state(self) -> Optional[Drone.EState]:
         """

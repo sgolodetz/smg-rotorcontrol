@@ -106,6 +106,7 @@ class LandingDroneController(DroneController):
         # the state of the drone can't be determined for some reason, this will do nothing.
         drone_state: Optional[Drone.EState] = self.__drone.get_state()
         if drone_state is not None and drone_state == Drone.FLYING:
+            self.__drone.stop()
             self.__drone.land()
 
     def render_ui(self) -> None:
