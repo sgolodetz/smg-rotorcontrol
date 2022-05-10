@@ -256,7 +256,7 @@ class RTSStyleDroneController(DroneController):
                 # Make a new takeoff controller.
                 new_controller = TakeoffDroneController(drone=self.__drone)
 
-                # Otherwise, if the user is pressing the 'p' key, and a goal position has been determined:
+        # Otherwise, if the user is pressing the 'p' key, and a goal position has been determined:
         elif event.type == pygame.KEYDOWN and event.key == pygame.K_p and self.__goal_pos is not None:
             # If the expected drone state is either unknown or 'flying':
             if expected_drone_state is None or expected_drone_state == Drone.FLYING:
