@@ -4,9 +4,11 @@ import os
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame
 
+from OpenGL.GL import *
 from timeit import default_timer as timer
 from typing import List, Optional, Tuple
 
+from smg.opengl import OpenGLUtil
 from smg.rotory.drones import Drone
 
 from .drone_controller import DroneController
@@ -49,6 +51,7 @@ class PPNDroneController(DroneController):
         self.__speed: float = 0.5
         self.__t_old: Optional[float] = None
         self.__target_pos: Optional[np.ndarray] = None
+        self.__trajectory: List[np.ndarray] = []
 
     # PUBLIC METHODS
 
@@ -122,6 +125,7 @@ class PPNDroneController(DroneController):
 
         # TODO: Comment here.
         self.__drone_pos = DroneController._extract_current_pos(tracker_c_t_i)
+        self.__trajectory.append(self.__drone_pos)
 
         # Set the estimated start position to the current position of the drone if it's not already known.
         if self.get_expected_start_pos() is None:
@@ -148,6 +152,33 @@ class PPNDroneController(DroneController):
 
         self.__t_old = t
         self.__rd_old = rd.copy()
+
+    def render_ui(self) -> None:
+        """Render the user interface for the controller."""
+        # Disable writing to the depth buffer. (This is to avoid the drone being blocked by the trajectory.)
+        glDepthMask(False)
+
+        # Enable blending.
+        glEnable(GL_BLEND)
+        glBlendColor(0.5, 0.5, 0.5, 0.5)
+        glBlendFunc(GL_CONSTANT_COLOR, GL_ONE_MINUS_CONSTANT_COLOR)
+
+        # TODO: Comment here.
+        glColor3f(0, 0, 1)
+        for i in range(len(self.__trajectory)):
+            p: np.ndarray = self.__trajectory[i]
+            OpenGLUtil.render_sphere(p, 0.025, slices=10, stacks=10)
+
+        # Disable blending again.
+        glDisable(GL_BLEND)
+
+        # Enable writing to the depth buffer again.
+        glDepthMask(True)
+
+        # TODO: Comment here.
+        glColor3f(1, 0.5, 0)
+        if self.__target_pos is not None:
+            OpenGLUtil.render_sphere(self.__target_pos, 0.1, slices=10, stacks=10)
 
     def reset(self) -> None:
         """Reset the controller."""
