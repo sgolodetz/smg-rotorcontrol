@@ -22,11 +22,12 @@ class TraversePathDroneController(DroneController):
 
     def __init__(self, *, drone: Drone):
         """
-        TODO
+        Construct a flight controller for a drone that tries to traverse a planned path.
 
-        :param drone:   TODO
+        :param drone:   The drone.
         """
         super().__init__()
+
         self.__drone: Drone = drone
         self.__path: Optional[Path] = None
 
@@ -61,7 +62,7 @@ class TraversePathDroneController(DroneController):
         # is found for the drone to continue moving.
         stop_drone: bool = True
 
-        # If there's still a current path, try to follow it.
+        # If there's a current path, try to follow it.
         if self.__path is not None:
             # First compute a vector from the drone's current position to the next waypoint on the path.
             offset: np.ndarray = self.__path[1].position - current_pos
@@ -110,8 +111,11 @@ class TraversePathDroneController(DroneController):
 
     def set_path(self, path: Optional[Path]) -> None:
         """
-        TODO
+        Set the path that the controller should try to make the drone traverse.
 
-        :param path:    TODO
+        .. note::
+            The path must start at the current position of the drone.
+
+        :param path:    The path that the controller should try to make the drone traverse.
         """
         self.__path = path
