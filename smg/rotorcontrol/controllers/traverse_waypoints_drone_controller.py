@@ -45,7 +45,6 @@ class TraverseWaypointsDroneController(DroneController):
         self.__ay: float = 10
         self.__debug: bool = debug
         self.__drone: Drone = drone
-        self.__movement_allowed: bool = True
         self.__planning_toolkit: PlanningToolkit = planning_toolkit
         self.__should_terminate: threading.Event = threading.Event()
         self.__waypoint_capture_range: float = 0.025
@@ -154,17 +153,8 @@ class TraverseWaypointsDroneController(DroneController):
         if tracker_c_t_i is None:
             raise RuntimeError("Error: Tracker poses must be provided when using 'traverse waypoints' control")
 
-        # --- Step 1: Process Events --- #
-
-        # Process any PyGame events that have happened since the last iteration.
-        for event in events:
-            if event.type == pygame.KEYDOWN:
-                # If the user presses the 'space' key, toggle whether the drone is allowed to move.
-                if event.key == pygame.K_SPACE:
-                    self.__movement_allowed = not self.__movement_allowed
-
         with self.__lock:
-            # --- Step 2: Update the drone's current position, and ensure its estimated start position is set ---#
+            # --- Step 1: Update the drone's current position, and ensure its estimated start position is set ---#
 
             # Extract the current position of the drone from the tracker pose provided.
             self.__current_pos: np.ndarray = DroneController._extract_current_pos(tracker_c_t_i)
@@ -173,7 +163,7 @@ class TraverseWaypointsDroneController(DroneController):
             if self.get_expected_start_pos() is None:
                 self.set_expected_start_pos(self.__current_pos.copy())
 
-            # --- Step 3: Trigger Path Planning (if required) ---#
+            # --- Step 2: Trigger Path Planning (if required) ---#
 
             # If there are any waypoints through which a path has not yet been planned, tell the path planner
             # that some path planning is needed.
@@ -181,7 +171,7 @@ class TraverseWaypointsDroneController(DroneController):
                 self.__planning_is_needed = True
                 self.__planning_needed.notify()
 
-            # --- Step 4: Update Current Path --- #
+            # --- Step 3: Update Current Path --- #
 
             # If there's a current path, update it based on the drone's current position.
             if self.__path is not None:
@@ -218,7 +208,7 @@ class TraverseWaypointsDroneController(DroneController):
                     # noinspection PyUnboundLocalVariable
                     print(f"Path Updating: {end - start}s")
 
-            # --- Step 5: Make Drone Follow Current Path --- #
+            # --- Step 4: Make Drone Follow Current Path --- #
 
             # A flag indicating whether or not the drone should stop moving. This will be set to False if any reason
             # is found for the drone to continue moving.
@@ -256,18 +246,16 @@ class TraverseWaypointsDroneController(DroneController):
                     right_rate: float = vg.scalar_projection(normalized_offset, -cam.u()) * speed
                     up_rate: float = vg.scalar_projection(normalized_offset, cam.v()) * speed
 
-                    # If the drone is allowed to move right now:
-                    if self.__movement_allowed:
-                        # Set the drone's rates accordingly.
-                        self.__drone.turn(turn_rate)
-                        if angle * 180 / np.pi <= 90.0 or turn_rate == 0.0:
-                            self.__drone.move_forward(forward_rate)
-                            self.__drone.move_right(right_rate)
-                            self.__drone.move_up(up_rate)
+                    # Set the drone's rates accordingly.
+                    self.__drone.turn(turn_rate)
+                    if angle * 180 / np.pi <= 90.0 or turn_rate == 0.0:
+                        self.__drone.move_forward(forward_rate)
+                        self.__drone.move_right(right_rate)
+                        self.__drone.move_up(up_rate)
 
-                        # Also set the flag that will cause the drone to be stopped to False, since we clearly want
-                        # the drone to move.
-                        stop_drone = False
+                    # Also set the flag that will cause the drone to be stopped to False, since we clearly want
+                    # the drone to move.
+                    stop_drone = False
 
             # If the drone should stop moving, stop it.
             if stop_drone:

@@ -47,6 +47,7 @@ class RTSStyleDroneController(DroneController):
         self.__goal_pos: Optional[np.ndarray] = None
         self.__height_offset: float = 1.0
         self.__inner_controllers: Deque[DroneController] = deque()
+        self.__movement_allowed: bool = True
         self.__picker: OctomapPicker = cast(OctomapPicker, picker)
         self.__picker_pos: Optional[np.ndarray] = None
         self.__planning_toolkit: PlanningToolkit = cast(PlanningToolkit, planning_toolkit)
@@ -102,8 +103,12 @@ class RTSStyleDroneController(DroneController):
 
         # Process any PyGame events that have happened since the last iteration.
         for event in events:
-            # If the user is pressing a key or clicking a mouse button:
-            if event.type == pygame.KEYDOWN or event.type == pygame.MOUSEBUTTONDOWN:
+            # If the user presses the 'space' key, toggle whether the drone is allowed to move.
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                self.__movement_allowed = not self.__movement_allowed
+
+            # If the user presses any other key or clicks a mouse button:
+            elif event.type == pygame.KEYDOWN or event.type == pygame.MOUSEBUTTONDOWN:
                 # If the user is currently pressing one of the shift keys (indicating that an append is desired),
                 # and the last inner controller is not None (indicating that an append is possible):
                 last_inner_controller: Optional[DroneController] = self.__get_last_inner_controller()
@@ -121,17 +126,12 @@ class RTSStyleDroneController(DroneController):
             elif event.type == pygame.MOUSEWHEEL:
                 self.__height_offset = np.clip(self.__height_offset + event.y * 0.2, 0.3, 3.0)
 
-        # Delegate lower-level control of the drone to the active inner controller (if any). If the active controller
-        # finishes, remove it from the queue and move on to the next one (if any).
+        # If there is an active inner controller and the drone is currently allowed to move, delegate lower-level
+        # control of the drone to the active inner controller; otherwise, stop the drone.
         active_inner_controller: Optional[DroneController] = self.__get_active_inner_controller()
-        if active_inner_controller is not None:
+        if active_inner_controller is not None and self.__movement_allowed:
             active_inner_controller.iterate(**kwargs)
-            if active_inner_controller.has_finished():
-                active_inner_controller.terminate()
-                self.__inner_controllers.popleft()
-
-        # If no inner controllers are left in the queue, stop the drone.
-        if len(self.__inner_controllers) == 0:
+        else:
             self.__drone.stop()
 
     def render_ui(self) -> None:
@@ -188,9 +188,28 @@ class RTSStyleDroneController(DroneController):
         """
         Get the active inner controller (if any).
 
+        .. note::
+            This may remove inner controllers that have finished in the process of trying to find the active one.
+
         :return:    The active inner controller (if any), or None otherwise.
         """
-        return self.__inner_controllers[0] if len(self.__inner_controllers) > 0 else None
+        active_inner_controller: Optional[DroneController] = None
+
+        # If we haven't yet found an active inner controller, and there are still some to search through:
+        while active_inner_controller is None and len(self.__inner_controllers) > 0:
+            # Get the first inner controller in the queue.
+            first_inner_controller: DroneController = self.__inner_controllers[0]
+
+            # If it has finished, terminate it and remove it from the queue.
+            if first_inner_controller.has_finished():
+                first_inner_controller.terminate()
+                self.__inner_controllers.popleft()
+
+            # Otherwise, set the active inner controller to this controller.
+            else:
+                active_inner_controller = first_inner_controller
+
+        return active_inner_controller
 
     def __get_last_inner_controller(self) -> Optional[DroneController]:
         """
