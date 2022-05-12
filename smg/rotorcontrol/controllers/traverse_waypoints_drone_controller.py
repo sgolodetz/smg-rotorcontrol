@@ -5,19 +5,17 @@ os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame
 import threading
 import time
-import vg
 
 from OpenGL.GL import *
 from timeit import default_timer as timer
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from smg.navigation import AStarPathPlanner, Path, PlanningToolkit
 from smg.opengl import OpenGLUtil
-from smg.rigging.cameras import SimpleCamera
-from smg.rigging.helpers import CameraPoseConverter
 from smg.rotory.drones import Drone
 
 from .drone_controller import DroneController
+from .traverse_path_drone_controller import TraversePathDroneController
 
 
 class TraverseWaypointsDroneController(DroneController):
@@ -47,6 +45,7 @@ class TraverseWaypointsDroneController(DroneController):
         self.__drone: Drone = drone
         self.__planning_toolkit: PlanningToolkit = planning_toolkit
         self.__should_terminate: threading.Event = threading.Event()
+        self.__traverse_path_controller: TraversePathDroneController = TraversePathDroneController(drone=drone)
         self.__waypoint_capture_range: float = 0.025
 
         # The shared variables, together with their lock.
@@ -149,6 +148,10 @@ class TraverseWaypointsDroneController(DroneController):
                                     is running (optional). Note that if the tracker is monocular, the transformation is
                                     unlikely to be scale-correct.
         """
+        # Make a copy of the keyword arguments that have been passed to the method, so that they can later be
+        # forwarded on to the 'traverse path' controller.
+        kwargs: Dict[str, Any] = {key: value for key, value in locals().items() if key != "self"}
+
         # If no tracker pose has been passed in, raise an exception and early out.
         if tracker_c_t_i is None:
             raise RuntimeError("Error: Tracker poses must be provided when using 'traverse waypoints' control")
@@ -157,7 +160,7 @@ class TraverseWaypointsDroneController(DroneController):
             # --- Step 1: Update the drone's current position, and ensure its estimated start position is set ---#
 
             # Extract the current position of the drone from the tracker pose provided.
-            self.__current_pos: np.ndarray = DroneController._extract_current_pos(tracker_c_t_i)
+            self.__current_pos = DroneController._extract_current_pos(tracker_c_t_i)
 
             # Set the estimated start position to the current position of the drone if it's not already known.
             if self.get_expected_start_pos() is None:
@@ -210,56 +213,9 @@ class TraverseWaypointsDroneController(DroneController):
 
             # --- Step 4: Make Drone Follow Current Path --- #
 
-            # A flag indicating whether or not the drone should stop moving. This will be set to False if any reason
-            # is found for the drone to continue moving.
-            stop_drone: bool = True
-
-            # If there's still a current path, try to follow it.
-            if self.__path is not None:
-                # First compute a vector from the drone's current position to the next waypoint on the path.
-                offset: np.ndarray = self.__path[1].position - self.__current_pos
-
-                # Provided we're far enough from the next waypoint for the vector towards it to be normalised:
-                offset_length: float = np.linalg.norm(offset)
-                if offset_length >= 1e-4:
-                    # Determine the current orientation of the drone in the horizontal plane.
-                    cam: SimpleCamera = CameraPoseConverter.pose_to_camera(tracker_c_t_i)
-                    current_n: np.ndarray = vg.normalize(np.array([cam.n()[0], 0, cam.n()[2]]))
-
-                    # Determine the target orientation of the drone in the horizontal plane.
-                    target_n: np.ndarray = vg.normalize(np.array([offset[0], 0, offset[2]]))
-
-                    # Determine whether the drone needs to turn left or right to achieve the target orientation.
-                    cp: np.ndarray = np.cross(current_n, target_n)
-                    sign: int = 1 if np.dot(cp, np.array([0, -1, 0])) >= 0 else -1
-
-                    # Determine the angle by which the drone needs to turn to achieve the target orientation.
-                    angle: float = sign * np.arccos(np.clip(np.dot(current_n, target_n), -1.0, 1.0))
-
-                    # Determine an appropriate turn rate for the drone.
-                    turn_rate: float = np.clip(-angle / (np.pi / 2), -1.0, 1.0) if offset_length >= 0.1 else 0.0
-
-                    # Determine the linear rates at which the drone should move in each of the three axes.
-                    speed: float = 0.5
-                    normalized_offset: np.ndarray = offset / offset_length
-                    forward_rate: float = vg.scalar_projection(normalized_offset, cam.n()) * speed
-                    right_rate: float = vg.scalar_projection(normalized_offset, -cam.u()) * speed
-                    up_rate: float = vg.scalar_projection(normalized_offset, cam.v()) * speed
-
-                    # Set the drone's rates accordingly.
-                    self.__drone.turn(turn_rate)
-                    if angle * 180 / np.pi <= 90.0 or turn_rate == 0.0:
-                        self.__drone.move_forward(forward_rate)
-                        self.__drone.move_right(right_rate)
-                        self.__drone.move_up(up_rate)
-
-                    # Also set the flag that will cause the drone to be stopped to False, since we clearly want
-                    # the drone to move.
-                    stop_drone = False
-
-            # If the drone should stop moving, stop it.
-            if stop_drone:
-                self.__drone.stop()
+            # Delegate path following to the 'traverse path' controller.
+            self.__traverse_path_controller.set_path(self.__path)
+            self.__traverse_path_controller.iterate(**kwargs)
 
     def render_ui(self) -> None:
         """Render the user interface for the controller."""
