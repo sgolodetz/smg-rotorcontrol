@@ -213,6 +213,7 @@ class TraverseWaypointsDroneController(DroneController):
 
             # --- Step 4: Make Drone Follow Current Path --- #
 
+            # Delegate path following to the 'traverse path' controller.
             self.__traverse_path_controller.set_path(self.__path)
             self.__traverse_path_controller.iterate(**kwargs)
 
