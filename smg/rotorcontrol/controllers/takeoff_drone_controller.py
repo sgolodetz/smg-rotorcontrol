@@ -89,7 +89,7 @@ class TakeoffDroneController(DroneController):
         # since once the drone has been asked to take off, it will transition to the 'taking off' state. Note also that
         # if the state of the drone can't be determined for some reason, this will do nothing.
         drone_state: Optional[Drone.EState] = self.__drone.get_state()
-        if True:  # drone_state is not None and drone_state == Drone.IDLE:
+        if drone_state is not None and drone_state == Drone.IDLE:
             self.__drone.takeoff()
 
     def render_ui(self) -> None:

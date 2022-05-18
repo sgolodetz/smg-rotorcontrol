@@ -105,7 +105,7 @@ class LandingDroneController(DroneController):
         # since once the drone has been asked to land, it will transition to the 'landing' state. Note also that if
         # the state of the drone can't be determined for some reason, this will do nothing.
         drone_state: Optional[Drone.EState] = self.__drone.get_state()
-        if True:  # drone_state is not None and drone_state == Drone.FLYING:
+        if drone_state is not None and drone_state == Drone.FLYING:
             self.__drone.stop()
             self.__drone.land()
 
