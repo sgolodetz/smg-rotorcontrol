@@ -88,7 +88,7 @@ class TraversePathDroneController(DroneController):
                 turn_rate: float = np.clip(-angle / (np.pi / 2), -1.0, 1.0) if offset_length >= 0.1 else 0.0
 
                 # Determine the linear rates at which the drone should move in each of the three axes.
-                speed: float = 0.2
+                speed: float = 0.3
                 normalized_offset: np.ndarray = offset / offset_length
                 forward_rate: float = vg.scalar_projection(normalized_offset, cam.n()) * speed
                 right_rate: float = vg.scalar_projection(normalized_offset, -cam.u()) * speed

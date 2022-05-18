@@ -46,7 +46,7 @@ class TraverseWaypointsDroneController(DroneController):
         self.__planning_toolkit: PlanningToolkit = planning_toolkit
         self.__should_terminate: threading.Event = threading.Event()
         self.__traverse_path_controller: TraversePathDroneController = TraversePathDroneController(drone=drone)
-        self.__waypoint_capture_range: float = 0.025
+        self.__waypoint_capture_range: float = 0.05
 
         # The shared variables, together with their lock.
         self.__current_pos: Optional[np.ndarray] = None
