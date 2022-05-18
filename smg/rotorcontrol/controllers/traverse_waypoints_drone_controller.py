@@ -152,9 +152,10 @@ class TraverseWaypointsDroneController(DroneController):
         # forwarded on to the 'traverse path' controller.
         kwargs: Dict[str, Any] = {key: value for key, value in locals().items() if key != "self"}
 
-        # If no tracker pose has been passed in, raise an exception and early out.
+        # If no tracker pose has been passed in, stop the drone and early out.
         if tracker_c_t_i is None:
-            raise RuntimeError("Error: Tracker poses must be provided when using 'traverse waypoints' control")
+            self.__drone.stop()
+            return
 
         with self.__lock:
             # --- Step 1: Update the drone's current position, and ensure its estimated start position is set ---#
