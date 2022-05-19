@@ -183,17 +183,7 @@ class RTSStyleDroneController(DroneController):
         # If a goal position has been determined:
         if self.__goal_pos is not None:
             # Render a sphere at the goal position with a colour that indicates the traversability of the goal node.
-            goal_node: PathNode = self.__planning_toolkit.pos_to_node(self.__goal_pos)
-            if self.__planning_toolkit.node_is_traversable(goal_node, use_clearance=True):
-                glColor3f(0, 1, 0)
-            elif self.__planning_toolkit.node_is_traversable(goal_node, use_clearance=False):
-                glColor3f(1, 0.5, 0)
-            else:
-                glColor3f(1, 0, 0)
-
-            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
-            OpenGLUtil.render_sphere(self.__goal_pos, 0.1, slices=10, stacks=10)
-            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
+            self.__render_traversability_sphere(self.__goal_pos, radius=0.1)
 
             # Render a vertical cylinder that joins the goal position to the closest point on the ground beneath it.
             # This makes it easier for the user to see where the goal lies in relation to the scene.
@@ -204,18 +194,7 @@ class RTSStyleDroneController(DroneController):
             if self.__pre_goal_pos is not None:
                 # Render a sphere at the pre-goal position with a colour that indicates the traversability of the
                 # pre-goal node.
-                # FIXME: Factor this into a separate function.
-                pre_goal_node: PathNode = self.__planning_toolkit.pos_to_node(self.__pre_goal_pos)
-                if self.__planning_toolkit.node_is_traversable(pre_goal_node, use_clearance=True):
-                    glColor3f(0, 1, 0)
-                elif self.__planning_toolkit.node_is_traversable(pre_goal_node, use_clearance=False):
-                    glColor3f(1, 0.5, 0)
-                else:
-                    glColor3f(1, 0, 0)
-
-                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
-                OpenGLUtil.render_sphere(self.__pre_goal_pos, 0.1, slices=10, stacks=10)
-                glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
+                self.__render_traversability_sphere(self.__pre_goal_pos, radius=0.1)
 
                 # Render an arrow to show the goal orientation.
                 glColor3f(1, 1, 0)
@@ -276,6 +255,26 @@ class RTSStyleDroneController(DroneController):
         :return:    The last inner controller (if any), or None otherwise.
         """
         return self.__inner_controllers[-1] if len(self.__inner_controllers) > 0 else None
+
+    def __render_traversability_sphere(self, pos: np.ndarray, *, radius: float) -> None:
+        """
+        Render a wireframe sphere at the specified position with a colour that indicates the traversability
+        of the containing node.
+
+        :param pos:     The specified position.
+        :param radius:  The radius to use for the sphere.
+        """
+        node: PathNode = self.__planning_toolkit.pos_to_node(pos)
+        if self.__planning_toolkit.node_is_traversable(node, use_clearance=True):
+            glColor3f(0, 1, 0)
+        elif self.__planning_toolkit.node_is_traversable(node, use_clearance=False):
+            glColor3f(1, 0.5, 0)
+        else:
+            glColor3f(1, 0, 0)
+
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
+        OpenGLUtil.render_sphere(pos, radius, slices=10, stacks=10)
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
 
     def __try_append_new_inner_controller(self, event: pygame.event.Event,
                                           last_inner_controller: Optional[DroneController]) -> None:
