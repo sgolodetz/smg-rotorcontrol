@@ -70,22 +70,35 @@ class TraversePathDroneController(DroneController):
             # Provided we're far enough from the next waypoint for the vector towards it to be normalised:
             offset_length: float = np.linalg.norm(offset)
             if offset_length >= 1e-4:
-                # Determine the current orientation of the drone in the horizontal plane.
+                # Convert the drone's pose to a camera for easier manipulation.
                 cam: SimpleCamera = CameraPoseConverter.pose_to_camera(tracker_c_t_i)
-                current_n: np.ndarray = vg.normalize(np.array([cam.n()[0], 0, cam.n()[2]]))
 
-                # Determine the target orientation of the drone in the horizontal plane.
-                target_n: np.ndarray = vg.normalize(np.array([offset[0], 0, offset[2]]))
+                # Project the vector to the next waypoint into the horizontal plane.
+                horizontal_offset: np.ndarray = np.array([offset[0], 0, offset[2]])
 
-                # Determine whether the drone needs to turn left or right to achieve the target orientation.
-                cp: np.ndarray = np.cross(current_n, target_n)
-                sign: int = 1 if np.dot(cp, np.array([0, -1, 0])) >= 0 else -1
+                # If we're far enough horizontally from the next waypoint to turn the drone before we get there:
+                horizontal_offset_length: float = np.linalg.norm(horizontal_offset)
+                if horizontal_offset_length >= 0.1:
+                    # Determine the current orientation of the drone in the horizontal plane.
+                    current_n: np.ndarray = vg.normalize(np.array([cam.n()[0], 0, cam.n()[2]]))
 
-                # Determine the angle by which the drone needs to turn to achieve the target orientation.
-                angle: float = sign * np.arccos(np.clip(np.dot(current_n, target_n), -1.0, 1.0))
+                    # Determine the target orientation of the drone in the horizontal plane.
+                    target_n: np.ndarray = vg.normalize(horizontal_offset)
 
-                # Determine an appropriate turn rate for the drone.
-                turn_rate: float = np.clip(-angle / (np.pi / 2), -1.0, 1.0) if offset_length >= 0.1 else 0.0
+                    # Determine whether the drone needs to turn left or right to achieve the target orientation.
+                    cp: np.ndarray = np.cross(current_n, target_n)
+                    sign: int = 1 if np.dot(cp, np.array([0, -1, 0])) >= 0 else -1
+
+                    # Determine the angle by which the drone needs to turn to achieve the target orientation.
+                    angle: float = sign * np.arccos(np.clip(np.dot(current_n, target_n), -1.0, 1.0))
+
+                    # Determine an appropriate turn rate for the drone.
+                    turn_rate: float = np.clip(-angle / (np.pi / 2), -1.0, 1.0)
+
+                # Otherwise, set both the angle by which the drone needs to turn and the turn rate to zero.
+                else:
+                    angle: float = 0.0
+                    turn_rate: float = 0.0
 
                 # Determine the linear rates at which the drone should move in each of the three axes.
                 speed: float = 0.5
