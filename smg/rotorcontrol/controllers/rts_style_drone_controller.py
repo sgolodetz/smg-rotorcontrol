@@ -1,5 +1,9 @@
 import numpy as np
+import os
+
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame
+import vg
 
 from collections import deque
 from OpenGL.GL import *
@@ -44,12 +48,14 @@ class RTSStyleDroneController(DroneController):
         self.__debug: bool = debug
         self.__drone: Drone = drone
         self.__goal_pos: Optional[np.ndarray] = None
+        self.__ground_pos: Optional[np.ndarray] = None
         self.__height_offset: float = 1.0
         self.__inner_controllers: Deque[DroneController] = deque()
         self.__movement_allowed: bool = True
+        self.__orienter_pos: Optional[np.ndarray] = None
         self.__picker: OctomapPicker = cast(OctomapPicker, picker)
-        self.__picker_pos: Optional[np.ndarray] = None
         self.__planning_toolkit: PlanningToolkit = cast(PlanningToolkit, planning_toolkit)
+        self.__pre_goal_pos: Optional[np.ndarray] = None
         self.__viewing_camera: Camera = viewing_camera
 
     # PUBLIC METHODS
@@ -80,6 +86,7 @@ class RTSStyleDroneController(DroneController):
             events = []
 
         # Pick from the viewing pose, and try to determine a goal position based on the position of the mouse.
+        # FIXME: Update all these comments.
         # FIXME: This currently assumes that there is a single picking sub-window that's at the top-left of the
         #        overall window. We should make this more general.
         picking_image, picking_mask = self.__picker.pick(
@@ -88,14 +95,40 @@ class RTSStyleDroneController(DroneController):
 
         mx, my = pygame.mouse.get_pos()
 
+        floater_pos: Optional[np.ndarray] = None
+        picker_pos: Optional[np.ndarray] = None
+
         # noinspection PyChainedComparisons
         if 0 <= mx < picking_mask.shape[1] and 0 <= my < picking_mask.shape[0] and picking_mask[my, mx] != 0:
-            self.__picker_pos = picking_image[my, mx]
-            self.__picker_pos = self.__planning_toolkit.pos_to_vpos(self.__picker_pos)
-            self.__goal_pos = self.__picker_pos + np.array([0, -self.__height_offset, 0])
+            picker_pos = picking_image[my, mx]
+            picker_pos = self.__planning_toolkit.pos_to_vpos(picker_pos)
+            floater_pos = picker_pos + np.array([0, -self.__height_offset, 0])
         else:
-            self.__picker_pos = None
-            self.__goal_pos = None
+            picker_pos = None
+            floater_pos = None
+
+        # TODO: Comment here.
+        if pygame.mouse.get_pressed(3)[0]:
+            orientation_valid: bool = False
+
+            if floater_pos is not None and self.__goal_pos is not None:
+                direction: np.ndarray = floater_pos - self.__goal_pos
+                direction[1] = 0.0
+                direction_length: float = np.linalg.norm(direction)
+                if direction_length >= 0.1:
+                    orientation_valid = True
+                    direction = vg.normalize(direction)
+                    self.__orienter_pos = self.__goal_pos + 0.5 * direction
+                    self.__pre_goal_pos = self.__goal_pos - 0.5 * direction
+
+            if not orientation_valid:
+                self.__orienter_pos = None
+                self.__pre_goal_pos = None
+        else:
+            self.__goal_pos = floater_pos
+            self.__ground_pos = picker_pos
+            self.__orienter_pos = None
+            self.__pre_goal_pos = None
 
         # Extract the current position of the drone from the tracker pose provided.
         drone_pos: np.ndarray = DroneController._extract_current_pos(tracker_c_t_i)
@@ -159,10 +192,34 @@ class RTSStyleDroneController(DroneController):
             glLineWidth(5)
             glColor3f(1, 0, 0)
             glBegin(GL_LINES)
-            glVertex3f(*self.__picker_pos)
+            glVertex3f(*self.__ground_pos)
             glVertex3f(*self.__goal_pos)
             glEnd()
             glLineWidth(1)
+
+            # TODO: Comment here.
+            if self.__pre_goal_pos is not None:
+                # TODO: Comment here.
+                glLineWidth(5)
+                glColor3f(1, 1, 0)
+                glBegin(GL_LINES)
+                glVertex3f(*self.__pre_goal_pos)
+                glVertex3f(*self.__orienter_pos)
+                glEnd()
+                glLineWidth(1)
+
+                # TODO: Comment here.
+                pre_goal_node: PathNode = self.__planning_toolkit.pos_to_node(self.__pre_goal_pos)
+                if self.__planning_toolkit.node_is_traversable(pre_goal_node, use_clearance=True):
+                    glColor3f(0, 1, 0)
+                elif self.__planning_toolkit.node_is_traversable(pre_goal_node, use_clearance=False):
+                    glColor3f(1, 0.5, 0)
+                else:
+                    glColor3f(1, 0, 0)
+
+                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
+                OpenGLUtil.render_sphere(self.__pre_goal_pos, 0.1, slices=10, stacks=10)
+                glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
 
     def terminate(self) -> None:
         """Tell the controller to terminate."""
