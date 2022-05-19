@@ -208,13 +208,8 @@ class RTSStyleDroneController(DroneController):
             # TODO: Comment here.
             if self.__pre_goal_pos is not None:
                 # TODO: Comment here.
-                glLineWidth(5)
                 glColor3f(1, 1, 0)
-                glBegin(GL_LINES)
-                glVertex3f(*self.__pre_goal_pos)
-                glVertex3f(*self.__orienter_pos)
-                glEnd()
-                glLineWidth(1)
+                OpenGLUtil.render_cylinder(self.__pre_goal_pos, self.__orienter_pos, 0.1, 0.0, slices=10)
 
                 # TODO: Comment here.
                 pre_goal_node: PathNode = self.__planning_toolkit.pos_to_node(self.__pre_goal_pos)
