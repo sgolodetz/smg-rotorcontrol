@@ -308,7 +308,8 @@ class RTSStyleDroneController(DroneController):
                     # If we do construct a new controller, record that, as it will need to be appended to the queue.
                     new_controller = traverse_waypoints_controller
 
-                # TODO: Comment here.
+                # If a pre-goal position (used when specifying the goal orientation) has been determined,
+                # append it to the traverse waypoint controller's existing list of waypoints.
                 if self.__pre_goal_pos is not None:
                     traverse_waypoints_controller.append_waypoints([self.__pre_goal_pos])
 
@@ -358,21 +359,20 @@ class RTSStyleDroneController(DroneController):
         if event.type == pygame.MOUSEBUTTONUP and event.button == 1 and self.__goal_pos is not None:
             # If the current drone state is either unknown or 'flying':
             if drone_state is None or drone_state == Drone.FLYING:
-                # Make a traverse waypoints controller and set its list of waypoints to be a singleton list
-                # containing the goal position.
-                # FIXME: Sort this comment out.
+                # Make a traverse waypoints controller.
                 traverse_waypoints_controller: TraverseWaypointsDroneController = TraverseWaypointsDroneController(
                     debug=self.__debug, drone=self.__drone, planning_toolkit=self.__planning_toolkit
                 )
 
-                # noinspection PyUnusedLocal
+                # Set the waypoints of the controller.
                 waypoints: List[np.ndarray] = []
                 if self.__pre_goal_pos is not None:
-                    waypoints = [self.__pre_goal_pos, self.__goal_pos]
-                else:
-                    waypoints = [self.__goal_pos]
+                    waypoints.append(self.__pre_goal_pos)
 
+                waypoints.append(self.__goal_pos)
                 traverse_waypoints_controller.set_waypoints(waypoints)
+
+                # Record that a new controller has been constructed.
                 new_controller = traverse_waypoints_controller
 
         # Otherwise, if the user is clicking the right mouse button:
