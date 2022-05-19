@@ -51,9 +51,9 @@ class RTSStyleDroneController(DroneController):
         self.__ground_pos: Optional[np.ndarray] = None
         self.__height_offset: float = 1.0
         self.__inner_controllers: Deque[DroneController] = deque()
-        self.__mouse_down: bool = False
+        self.__left_mouse_down: bool = False
         self.__movement_allowed: bool = True
-        self.__orienter_pos: Optional[np.ndarray] = None
+        self.__orienting_pos: Optional[np.ndarray] = None
         self.__picker: OctomapPicker = cast(OctomapPicker, picker)
         self.__planning_toolkit: PlanningToolkit = cast(PlanningToolkit, planning_toolkit)
         self.__pre_goal_pos: Optional[np.ndarray] = None
@@ -86,8 +86,9 @@ class RTSStyleDroneController(DroneController):
         if events is None:
             events = []
 
-        # Pick from the viewing pose, and try to determine a goal position based on the position of the mouse.
-        # FIXME: Update all these comments.
+        # Pick from the viewing pose, and try to use the position of the mouse to determine:
+        #  (i) The picked position, a point on the ground in the scene (if any) that the user is directly designating.
+        # (ii) The floating position, a point that's floating in space a specified height above the picked position.
         # FIXME: This currently assumes that there is a single picking sub-window that's at the top-left of the
         #        overall window. We should make this more general.
         picking_image, picking_mask = self.__picker.pick(
@@ -96,44 +97,62 @@ class RTSStyleDroneController(DroneController):
 
         mx, my = pygame.mouse.get_pos()
 
-        floater_pos: Optional[np.ndarray] = None
-        picker_pos: Optional[np.ndarray] = None
+        floating_pos: Optional[np.ndarray] = None
+        picked_pos: Optional[np.ndarray] = None
 
         # noinspection PyChainedComparisons
         if 0 <= mx < picking_mask.shape[1] and 0 <= my < picking_mask.shape[0] and picking_mask[my, mx] != 0:
-            picker_pos = picking_image[my, mx]
-            picker_pos = self.__planning_toolkit.pos_to_vpos(picker_pos)
-            floater_pos = picker_pos + np.array([0, -self.__height_offset, 0])
+            picked_pos = picking_image[my, mx]
+            picked_pos = self.__planning_toolkit.pos_to_vpos(picked_pos)
+            floating_pos = picked_pos + np.array([0, -self.__height_offset, 0])
         else:
-            picker_pos = None
-            floater_pos = None
+            picked_pos = None
+            floating_pos = None
 
-        # TODO: Comment here.
-        if pygame.mouse.get_pressed(3)[0]:
-            self.__mouse_down = True
+        # If the left mouse button is pressed:
+        if pygame.mouse.get_pressed(num_buttons=3)[0]:
+            # Set the flag indicating that it's pressed.
+            self.__left_mouse_down = True
 
+            # Initialise a flag that will record whether or not we've been able to determine a goal orientation.
             orientation_valid: bool = False
 
-            if floater_pos is not None and self.__goal_pos is not None:
-                direction: np.ndarray = floater_pos - self.__goal_pos
-                direction[1] = 0.0
-                direction_length: float = np.linalg.norm(direction)
-                if direction_length >= 0.1:
-                    orientation_valid = True
-                    direction = vg.normalize(direction)
-                    self.__orienter_pos = self.__goal_pos + 0.5 * direction
-                    self.__pre_goal_pos = self.__goal_pos - 1.0 * direction
+            # If the floating position (see above) has been determined, and there's an existing goal position:
+            if floating_pos is not None and self.__goal_pos is not None:
+                # Project the vector from the goal position to the floating position into the horizontal plane
+                # to try to determine the goal orientation vector.
+                orientation: np.ndarray = floating_pos - self.__goal_pos
+                orientation[1] = 0.0
 
+                # If the goal orientation vector is a sufficient length, indicating that the user has moved the
+                # mouse away from the original ground position and wants to specify a goal orientation:
+                orientation_length: float = np.linalg.norm(orientation)
+                if orientation_length >= 0.1:
+                    # Normalize the goal orientation vector, record that we've been able to determine a
+                    # goal orientation, and set the associated variables accordingly.
+                    orientation = vg.normalize(orientation)
+                    orientation_valid = True
+                    self.__orienting_pos = self.__goal_pos + 0.5 * orientation
+                    self.__pre_goal_pos = self.__goal_pos - 1.0 * orientation
+
+            # If we haven't been able to determine a goal orientation, reset the associated variables accordingly.
             if not orientation_valid:
-                self.__orienter_pos = None
+                self.__orienting_pos = None
                 self.__pre_goal_pos = None
+
+        # Otherwise, if the left mouse button isn't pressed:
         else:
-            if self.__mouse_down:
-                self.__mouse_down = False
+            # If the left mouse button has just been released, reset the flag to False, but leave the variables
+            # specifying where the user wants the drone to move alone (since they'll be used later in the frame).
+            if self.__left_mouse_down:
+                self.__left_mouse_down = False
+
+            # Otherwise, set the goal and ground positions to be the floating and picked positions, respectively,
+            # and reset the variables associated with specifying a goal orientation.
             else:
-                self.__goal_pos = floater_pos
-                self.__ground_pos = picker_pos
-                self.__orienter_pos = None
+                self.__goal_pos = floating_pos
+                self.__ground_pos = picked_pos
+                self.__orienting_pos = None
                 self.__pre_goal_pos = None
 
         # Extract the current position of the drone from the tracker pose provided.
@@ -198,9 +217,9 @@ class RTSStyleDroneController(DroneController):
 
                 # Render an arrow to show the goal orientation.
                 glColor3f(1, 1, 0)
-                join_pos: np.ndarray = 0.2 * self.__pre_goal_pos + 0.8 * self.__orienter_pos
+                join_pos: np.ndarray = 0.2 * self.__pre_goal_pos + 0.8 * self.__orienting_pos
                 OpenGLUtil.render_cylinder(self.__pre_goal_pos, join_pos, 0.05, 0.05, slices=10)
-                OpenGLUtil.render_cylinder(join_pos, self.__orienter_pos, 0.15, 0.0, slices=10)
+                OpenGLUtil.render_cylinder(join_pos, self.__orienting_pos, 0.15, 0.0, slices=10)
 
     def terminate(self) -> None:
         """Tell the controller to terminate."""
