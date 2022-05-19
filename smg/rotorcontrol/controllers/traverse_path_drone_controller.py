@@ -30,7 +30,6 @@ class TraversePathDroneController(DroneController):
 
         self.__drone: Drone = drone
         self.__path: Optional[Path] = None
-        self.__previous_target_n: Optional[np.ndarray] = None
 
     # PUBLIC METHODS
 
@@ -80,21 +79,12 @@ class TraversePathDroneController(DroneController):
                 # Project the vector to the next waypoint into the horizontal plane.
                 horizontal_offset: np.ndarray = np.array([offset[0], 0, offset[2]])
 
-                # noinspection PyUnusedLocal
-                target_n: Optional[np.ndarray] = None
-
                 # If we're far enough horizontally from the next waypoint to turn the drone before we get there:
                 horizontal_offset_length: float = np.linalg.norm(horizontal_offset)
-                if horizontal_offset_length >= 1e-4:
+                if horizontal_offset_length >= 0.1:
                     # Determine the target orientation of the drone in the horizontal plane.
-                    target_n = vg.normalize(horizontal_offset)
+                    target_n: np.ndarray = vg.normalize(horizontal_offset)
 
-                    # TODO: Comment here.
-                    self.__previous_target_n = target_n
-                else:
-                    target_n = self.__previous_target_n
-
-                if target_n is not None:
                     # Determine whether the drone needs to turn left or right to achieve the target orientation.
                     cp: np.ndarray = np.cross(current_n, target_n)
                     sign: int = 1 if np.dot(cp, np.array([0, -1, 0])) >= 0 else -1
@@ -119,7 +109,7 @@ class TraversePathDroneController(DroneController):
 
                 # Set the drone's rates accordingly.
                 self.__drone.turn(turn_rate)
-                if angle * 180 / np.pi <= 10.0 or turn_rate == 0.0:
+                if np.fabs(angle) * 180 / np.pi <= 30.0 or turn_rate == 0.0:
                     self.__drone.move_forward(forward_rate)
                     self.__drone.move_right(right_rate)
                     self.__drone.move_up(up_rate)
@@ -146,4 +136,3 @@ class TraversePathDroneController(DroneController):
         :param path:    The path that the controller should try to make the drone traverse.
         """
         self.__path = path
-        self.__previous_target_n = None

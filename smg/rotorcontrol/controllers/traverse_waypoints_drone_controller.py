@@ -123,7 +123,6 @@ class TraverseWaypointsDroneController(DroneController):
 
         :return:    True, if the controller has finished, or False otherwise.
         """
-        return False
         with self.__lock:
             return len(self.__waypoints) == 0
 
