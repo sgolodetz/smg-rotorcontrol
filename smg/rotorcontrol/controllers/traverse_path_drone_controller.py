@@ -73,19 +73,20 @@ class TraversePathDroneController(DroneController):
                 # Convert the drone's pose to a camera for easier manipulation.
                 cam: SimpleCamera = CameraPoseConverter.pose_to_camera(tracker_c_t_i)
 
-                # Determine the current orientation of the drone in the horizontal plane.
-                current_n: np.ndarray = vg.normalize(np.array([cam.n()[0], 0, cam.n()[2]]))
-
                 # Project the vector to the next waypoint into the horizontal plane.
                 horizontal_offset: np.ndarray = np.array([offset[0], 0, offset[2]])
 
                 # If we're far enough horizontally from the next waypoint to turn the drone before we get there:
                 horizontal_offset_length: float = np.linalg.norm(horizontal_offset)
                 if horizontal_offset_length >= 0.1:
+                    # Determine the current orientation of the drone in the horizontal plane.
+                    current_n: np.ndarray = vg.normalize(np.array([cam.n()[0], 0, cam.n()[2]]))
+
                     # Determine the target orientation of the drone in the horizontal plane.
                     target_n: np.ndarray = vg.normalize(horizontal_offset)
 
                     # Determine whether the drone needs to turn left or right to achieve the target orientation.
+                    # (Note that y points downwards in our coordinate system!)
                     cp: np.ndarray = np.cross(current_n, target_n)
                     sign: int = 1 if np.dot(cp, np.array([0, -1, 0])) >= 0 else -1
 
@@ -100,26 +101,31 @@ class TraversePathDroneController(DroneController):
                     angle: float = 0.0
                     turn_rate: float = 0.0
 
-                # Determine the linear rates at which the drone should move in each of the three axes.
+                # Set the drone's turn rate.
+                self.__drone.turn(turn_rate)
+
+                # Determine the linear rates at which the drone should in principle move in each of the three axes.
                 speed: float = 0.5
                 normalized_offset: np.ndarray = offset / offset_length
                 forward_rate: float = vg.scalar_projection(normalized_offset, cam.n()) * speed
                 right_rate: float = vg.scalar_projection(normalized_offset, -cam.u()) * speed
                 up_rate: float = vg.scalar_projection(normalized_offset, cam.v()) * speed
 
-                # Set the drone's rates accordingly.
-                self.__drone.turn(turn_rate)
+                # If the drone's current orientation is within a reasonable angle of its target orientation,
+                # or alternatively if the drone is not currently turning, set the calculated linear rates.
                 if np.fabs(angle) * 180 / np.pi <= 30.0 or turn_rate == 0.0:
                     self.__drone.move_forward(forward_rate)
                     self.__drone.move_right(right_rate)
                     self.__drone.move_up(up_rate)
+
+                # Otherwise, suppress the drone's linear movement.
                 else:
                     self.__drone.move_forward(0.0)
                     self.__drone.move_right(0.0)
                     self.__drone.move_up(0.0)
 
-                # Also set the flag that will cause the drone to be stopped to False, since we clearly want
-                # the drone to move.
+                # Set the flag that will cause the drone to be stopped below to False, since we have just set the
+                # rates we want manually.
                 stop_drone = False
 
         # If the drone should stop moving, stop it.
