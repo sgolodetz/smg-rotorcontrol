@@ -30,6 +30,7 @@ class TraversePathDroneController(DroneController):
 
         self.__drone: Drone = drone
         self.__path: Optional[Path] = None
+        self.__previous_target_n: Optional[np.ndarray] = None
 
     # PUBLIC METHODS
 
@@ -73,18 +74,27 @@ class TraversePathDroneController(DroneController):
                 # Convert the drone's pose to a camera for easier manipulation.
                 cam: SimpleCamera = CameraPoseConverter.pose_to_camera(tracker_c_t_i)
 
+                # Determine the current orientation of the drone in the horizontal plane.
+                current_n: np.ndarray = vg.normalize(np.array([cam.n()[0], 0, cam.n()[2]]))
+
                 # Project the vector to the next waypoint into the horizontal plane.
                 horizontal_offset: np.ndarray = np.array([offset[0], 0, offset[2]])
 
+                # noinspection PyUnusedLocal
+                target_n: Optional[np.ndarray] = None
+
                 # If we're far enough horizontally from the next waypoint to turn the drone before we get there:
                 horizontal_offset_length: float = np.linalg.norm(horizontal_offset)
-                if horizontal_offset_length >= 0.1:
-                    # Determine the current orientation of the drone in the horizontal plane.
-                    current_n: np.ndarray = vg.normalize(np.array([cam.n()[0], 0, cam.n()[2]]))
-
+                if horizontal_offset_length >= 1e-4:
                     # Determine the target orientation of the drone in the horizontal plane.
-                    target_n: np.ndarray = vg.normalize(horizontal_offset)
+                    target_n = vg.normalize(horizontal_offset)
 
+                    # TODO: Comment here.
+                    self.__previous_target_n = target_n
+                else:
+                    target_n = self.__previous_target_n
+
+                if target_n is not None:
                     # Determine whether the drone needs to turn left or right to achieve the target orientation.
                     cp: np.ndarray = np.cross(current_n, target_n)
                     sign: int = 1 if np.dot(cp, np.array([0, -1, 0])) >= 0 else -1
@@ -109,10 +119,14 @@ class TraversePathDroneController(DroneController):
 
                 # Set the drone's rates accordingly.
                 self.__drone.turn(turn_rate)
-                if angle * 180 / np.pi <= 90.0 or turn_rate == 0.0:
+                if angle * 180 / np.pi <= 10.0 or turn_rate == 0.0:
                     self.__drone.move_forward(forward_rate)
                     self.__drone.move_right(right_rate)
                     self.__drone.move_up(up_rate)
+                else:
+                    self.__drone.move_forward(0.0)
+                    self.__drone.move_right(0.0)
+                    self.__drone.move_up(0.0)
 
                 # Also set the flag that will cause the drone to be stopped to False, since we clearly want
                 # the drone to move.
@@ -132,3 +146,4 @@ class TraversePathDroneController(DroneController):
         :param path:    The path that the controller should try to make the drone traverse.
         """
         self.__path = path
+        self.__previous_target_n = None

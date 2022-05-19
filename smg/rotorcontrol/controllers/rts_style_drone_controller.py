@@ -51,6 +51,7 @@ class RTSStyleDroneController(DroneController):
         self.__ground_pos: Optional[np.ndarray] = None
         self.__height_offset: float = 1.0
         self.__inner_controllers: Deque[DroneController] = deque()
+        self.__mouse_down: bool = False
         self.__movement_allowed: bool = True
         self.__orienter_pos: Optional[np.ndarray] = None
         self.__picker: OctomapPicker = cast(OctomapPicker, picker)
@@ -109,6 +110,8 @@ class RTSStyleDroneController(DroneController):
 
         # TODO: Comment here.
         if pygame.mouse.get_pressed(3)[0]:
+            self.__mouse_down = True
+
             orientation_valid: bool = False
 
             if floater_pos is not None and self.__goal_pos is not None:
@@ -119,16 +122,19 @@ class RTSStyleDroneController(DroneController):
                     orientation_valid = True
                     direction = vg.normalize(direction)
                     self.__orienter_pos = self.__goal_pos + 0.5 * direction
-                    self.__pre_goal_pos = self.__goal_pos - 0.5 * direction
+                    self.__pre_goal_pos = self.__goal_pos - 1.0 * direction
 
             if not orientation_valid:
                 self.__orienter_pos = None
                 self.__pre_goal_pos = None
         else:
-            self.__goal_pos = floater_pos
-            self.__ground_pos = picker_pos
-            self.__orienter_pos = None
-            self.__pre_goal_pos = None
+            if self.__mouse_down:
+                self.__mouse_down = False
+            else:
+                self.__goal_pos = floater_pos
+                self.__ground_pos = picker_pos
+                self.__orienter_pos = None
+                self.__pre_goal_pos = None
 
         # Extract the current position of the drone from the tracker pose provided.
         drone_pos: np.ndarray = DroneController._extract_current_pos(tracker_c_t_i)
@@ -139,8 +145,10 @@ class RTSStyleDroneController(DroneController):
             if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
                 self.__movement_allowed = not self.__movement_allowed
 
-            # If the user presses any other key or clicks a mouse button:
-            elif event.type == pygame.KEYDOWN or event.type == pygame.MOUSEBUTTONDOWN:
+            # If the user presses any other key, or clicks or releases a mouse button:
+            elif event.type == pygame.KEYDOWN \
+                    or event.type == pygame.MOUSEBUTTONDOWN \
+                    or event.type == pygame.MOUSEBUTTONUP:
                 # If the user is currently pressing one of the shift keys (indicating that an append is desired),
                 # and the last inner controller is not None (indicating that an append is possible):
                 last_inner_controller: Optional[DroneController] = self.__get_last_inner_controller()
@@ -290,8 +298,8 @@ class RTSStyleDroneController(DroneController):
         expected_drone_state: Optional[Drone.EState] = last_inner_controller.get_expected_end_state()
         new_controller: Optional[DroneController] = None
 
-        # If the user is clicking the left mouse button, and a goal position has been determined:
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.__goal_pos is not None:
+        # If the user is releasing the left mouse button, and a goal position has been determined:
+        if event.type == pygame.MOUSEBUTTONUP and event.button == 1 and self.__goal_pos is not None:
             # If the expected drone state once the previous controller finishes is either unknown or 'flying':
             if expected_drone_state is None or expected_drone_state == Drone.FLYING:
                 # If the last inner controller is a traverse waypoints controller, reuse it, else construct a new one.
@@ -306,6 +314,10 @@ class RTSStyleDroneController(DroneController):
 
                     # If we do construct a new controller, record that, as it will need to be appended to the queue.
                     new_controller = traverse_waypoints_controller
+
+                # TODO: Comment here.
+                if self.__pre_goal_pos is not None:
+                    traverse_waypoints_controller.append_waypoints([self.__pre_goal_pos])
 
                 # Append the goal position to the traverse waypoint controller's existing list of waypoints.
                 traverse_waypoints_controller.append_waypoints([self.__goal_pos])
@@ -349,17 +361,25 @@ class RTSStyleDroneController(DroneController):
         drone_state: Optional[Drone.EState] = self.__drone.get_state()
         new_controller: Optional[DroneController] = None
 
-        # If the user is clicking the left mouse button, and a goal position has been determined:
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.__goal_pos is not None:
+        # If the user is releasing the left mouse button, and a goal position has been determined:
+        if event.type == pygame.MOUSEBUTTONUP and event.button == 1 and self.__goal_pos is not None:
             # If the current drone state is either unknown or 'flying':
             if drone_state is None or drone_state == Drone.FLYING:
                 # Make a traverse waypoints controller and set its list of waypoints to be a singleton list
                 # containing the goal position.
+                # FIXME: Sort this comment out.
                 traverse_waypoints_controller: TraverseWaypointsDroneController = TraverseWaypointsDroneController(
                     debug=self.__debug, drone=self.__drone, planning_toolkit=self.__planning_toolkit
                 )
 
-                traverse_waypoints_controller.set_waypoints([self.__goal_pos])
+                # noinspection PyUnusedLocal
+                waypoints: List[np.ndarray] = []
+                if self.__pre_goal_pos is not None:
+                    waypoints = [self.__pre_goal_pos, self.__goal_pos]
+                else:
+                    waypoints = [self.__goal_pos]
+
+                traverse_waypoints_controller.set_waypoints(waypoints)
                 new_controller = traverse_waypoints_controller
 
         # Otherwise, if the user is clicking the right mouse button:
