@@ -47,6 +47,7 @@ class RTSStyleDroneController(DroneController):
 
         self.__debug: bool = debug
         self.__drone: Drone = drone
+        self.__goal_orientation_valid: bool = False
         self.__goal_pos: Optional[np.ndarray] = None
         self.__ground_pos: Optional[np.ndarray] = None
         self.__height_offset: float = 1.0
