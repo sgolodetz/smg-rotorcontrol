@@ -47,6 +47,7 @@ class RTSStyleDroneController(DroneController):
 
         self.__debug: bool = debug
         self.__drone: Drone = drone
+        self.__goal_orientation_valid: bool = False
         self.__goal_pos: Optional[np.ndarray] = None
         self.__ground_pos: Optional[np.ndarray] = None
         self.__height_offset: float = 1.0
@@ -148,8 +149,12 @@ class RTSStyleDroneController(DroneController):
                 # pre-goal node.
                 self.__render_traversability_sphere(self.__pre_goal_pos, radius=0.1)
 
-                # Render an arrow to show the goal orientation.
-                glColor3f(1, 1, 0)
+                # Render an arrow to show the goal orientation, using a colour that indicates its validity.
+                if self.__goal_orientation_valid:
+                    glColor3f(0, 1, 0)
+                else:
+                    glColor3f(1, 0, 0)
+
                 join_pos: np.ndarray = 0.2 * self.__pre_goal_pos + 0.8 * self.__orienting_pos
                 OpenGLUtil.render_cylinder(self.__pre_goal_pos, join_pos, 0.05, 0.05, slices=10)
                 OpenGLUtil.render_cylinder(join_pos, self.__orienting_pos, 0.15, 0.0, slices=10)
@@ -160,6 +165,12 @@ class RTSStyleDroneController(DroneController):
             inner_controller.terminate()
 
     # PRIVATE METHODS
+
+    def __clear_goal_orientation(self) -> None:
+        """Reset the variables associated with specifying a goal orientation."""
+        self.__goal_orientation_valid = False
+        self.__orienting_pos = None
+        self.__pre_goal_pos = None
 
     def __clear_inner_controllers(self) -> None:
         """Clear the inner controllers queue."""
@@ -247,26 +258,30 @@ class RTSStyleDroneController(DroneController):
         if event.type == pygame.MOUSEBUTTONUP and event.button == 1 and self.__goal_pos is not None:
             # If the expected drone state once the previous controller finishes is either unknown or 'flying':
             if expected_drone_state is None or expected_drone_state == Drone.FLYING:
-                # If the last inner controller is a traverse waypoints controller, reuse it, else construct a new one.
-                # noinspection PyUnusedLocal
-                traverse_waypoints_controller: Optional[TraverseWaypointsDroneController] = None
-                if type(last_inner_controller) is TraverseWaypointsDroneController:
-                    traverse_waypoints_controller = cast(TraverseWaypointsDroneController, last_inner_controller)
-                else:
-                    traverse_waypoints_controller = TraverseWaypointsDroneController(
-                        debug=self.__debug, drone=self.__drone, planning_toolkit=self.__planning_toolkit
-                    )
+                # If either no goal orientation has been specified, or the one that has been specified is valid:
+                if self.__pre_goal_pos is None or self.__goal_orientation_valid:
+                    # If the last inner controller is a traverse waypoints one, reuse it, else construct a new one.
+                    # noinspection PyUnusedLocal
+                    traverse_waypoints_controller: Optional[TraverseWaypointsDroneController] = None
+                    if type(last_inner_controller) is TraverseWaypointsDroneController:
+                        traverse_waypoints_controller = cast(TraverseWaypointsDroneController, last_inner_controller)
+                    else:
+                        traverse_waypoints_controller = TraverseWaypointsDroneController(
+                            debug=self.__debug, drone=self.__drone, planning_toolkit=self.__planning_toolkit
+                        )
 
-                    # If we do construct a new controller, record that, as it will need to be appended to the queue.
-                    new_controller = traverse_waypoints_controller
+                        # If we do construct a new controller, record that, as it will need to be appended to the queue.
+                        new_controller = traverse_waypoints_controller
 
-                # If a pre-goal position (used when specifying the goal orientation) has been determined,
-                # append it to the traverse waypoint controller's existing list of waypoints.
-                if self.__pre_goal_pos is not None:
-                    traverse_waypoints_controller.append_waypoints([self.__pre_goal_pos])
+                    # Append the relevant waypoints to the controller.
+                    waypoints: List[np.ndarray] = []
+                    if self.__pre_goal_pos is not None:
+                        waypoints.append(self.__pre_goal_pos)
+                        waypoints.append(self.__goal_pos)
+                    else:
+                        waypoints.append(self.__goal_pos)
 
-                # Append the goal position to the traverse waypoint controller's existing list of waypoints.
-                traverse_waypoints_controller.append_waypoints([self.__goal_pos])
+                    traverse_waypoints_controller.append_waypoints(waypoints)
 
         # Otherwise, if the user is clicking the right mouse button:
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
@@ -311,21 +326,25 @@ class RTSStyleDroneController(DroneController):
         if event.type == pygame.MOUSEBUTTONUP and event.button == 1 and self.__goal_pos is not None:
             # If the current drone state is either unknown or 'flying':
             if drone_state is None or drone_state == Drone.FLYING:
-                # Make a traverse waypoints controller.
-                traverse_waypoints_controller: TraverseWaypointsDroneController = TraverseWaypointsDroneController(
-                    debug=self.__debug, drone=self.__drone, planning_toolkit=self.__planning_toolkit
-                )
+                # If either no goal orientation has been specified, or the one that has been specified is valid:
+                if self.__pre_goal_pos is None or self.__goal_orientation_valid:
+                    # Make a traverse waypoints controller.
+                    traverse_waypoints_controller: TraverseWaypointsDroneController = TraverseWaypointsDroneController(
+                        debug=self.__debug, drone=self.__drone, planning_toolkit=self.__planning_toolkit
+                    )
 
-                # Set the waypoints of the controller.
-                waypoints: List[np.ndarray] = []
-                if self.__pre_goal_pos is not None:
-                    waypoints.append(self.__pre_goal_pos)
+                    # Set the waypoints of the controller.
+                    waypoints: List[np.ndarray] = []
+                    if self.__pre_goal_pos is not None:
+                        waypoints.append(self.__pre_goal_pos)
+                        waypoints.append(self.__goal_pos)
+                    else:
+                        waypoints.append(self.__goal_pos)
 
-                waypoints.append(self.__goal_pos)
-                traverse_waypoints_controller.set_waypoints(waypoints)
+                    traverse_waypoints_controller.set_waypoints(waypoints)
 
-                # Record that a new controller has been constructed.
-                new_controller = traverse_waypoints_controller
+                    # Record that a new controller has been constructed.
+                    new_controller = traverse_waypoints_controller
 
         # Otherwise, if the user is clicking the right mouse button:
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
@@ -382,7 +401,7 @@ class RTSStyleDroneController(DroneController):
             self.__left_mouse_down = True
 
             # Initialise a flag that will record whether or not we've been able to determine a goal orientation.
-            orientation_valid: bool = False
+            orientation_determined: bool = False
 
             # If the floating position (see above) has been determined, and there's an existing goal position:
             if floating_pos is not None and self.__goal_pos is not None:
@@ -398,14 +417,18 @@ class RTSStyleDroneController(DroneController):
                     # Normalize the goal orientation vector, record that we've been able to determine a
                     # goal orientation, and set the associated variables accordingly.
                     orientation = vg.normalize(orientation)
-                    orientation_valid = True
+                    orientation_determined = True
                     self.__orienting_pos = self.__goal_pos + 0.5 * orientation
                     self.__pre_goal_pos = self.__goal_pos - 1.0 * orientation
+                    self.__goal_orientation_valid = self.__planning_toolkit.line_segment_is_traversable(
+                        self.__planning_toolkit.pos_to_vpos(self.__pre_goal_pos),
+                        self.__planning_toolkit.pos_to_vpos(self.__goal_pos),
+                        use_clearance=True
+                    )
 
             # If we haven't been able to determine a goal orientation, reset the associated variables accordingly.
-            if not orientation_valid:
-                self.__orienting_pos = None
-                self.__pre_goal_pos = None
+            if not orientation_determined:
+                self.__clear_goal_orientation()
 
         # Otherwise, if the left mouse button has just been released, reset the flag to False, but leave the
         # variables specifying the goal alone (since they'll be used later in the frame).
@@ -417,5 +440,4 @@ class RTSStyleDroneController(DroneController):
         else:
             self.__goal_pos = floating_pos
             self.__ground_pos = picked_pos
-            self.__orienting_pos = None
-            self.__pre_goal_pos = None
+            self.__clear_goal_orientation()
