@@ -75,11 +75,10 @@ class AWSTranscribeDroneController(DroneController):
             # Only print final result when is_partial is FALSE to get final transcript result without duplicates.
             for result in results:
                 for alt in result.alternatives:
-                    #print(alt.transcript)
-                    #if not result.is_partial:
                     if result.is_partial:
                         partial_result = alt.transcript
                         partial_result = partial_result.lower()  # Convert result to case-insensitive.
+                        partial_result = "".join(filter(lambda c: str.isalnum(c) or str.isspace(c), partial_result))
                         print("Transcription: ", partial_result)
                         # print(result.start_time, result.end_time)
                         compute_time = result.end_time - result.start_time
@@ -147,8 +146,10 @@ class AWSTranscribeDroneController(DroneController):
                                     is running (optional). Note that if the tracker is monocular, the transformation is
                                     unlikely to be scale-correct.
         """
-        linear_rate: float = 0.2
+        forward_rate: float = 0.2
+        right_rate: float = 0.2
         turn_rate: float = 0.2
+        up_rate: float = 0.1
 
         while not self.__command_queue.empty():
             command: AWSTranscribeDroneController.DroneCommand = self.__command_queue.get()
@@ -163,13 +164,13 @@ class AWSTranscribeDroneController(DroneController):
             elif drone_state == Drone.FLYING:
                 if command.command == "back" or command.command == "backward":
                     print(f"Command: {command.command}")
-                    self.__drone.move_forward(-linear_rate)
+                    self.__drone.move_forward(-forward_rate)
                 elif command.command == "down":
                     print(f"Command: {command.command}")
-                    self.__drone.move_up(-linear_rate)
+                    self.__drone.move_up(-up_rate)
                 elif command.command == "forward":
                     print(f"Command: {command.command}")
-                    self.__drone.move_forward(linear_rate)
+                    self.__drone.move_forward(forward_rate)
                 elif command.command == "go straight":
                     print(f"Command: {command.command}")
                     self.__drone.turn(0.0)
@@ -182,10 +183,10 @@ class AWSTranscribeDroneController(DroneController):
                     self.__drone.move_up(0.0)
                 elif command.command == "move left":
                     print(f"Command: {command.command}")
-                    self.__drone.move_right(-linear_rate)
-                elif command.command == "move_right":
+                    self.__drone.move_right(-right_rate)
+                elif command.command == "move right":
                     print(f"Command: {command.command}")
-                    self.__drone.move_right(-linear_rate)
+                    self.__drone.move_right(right_rate)
                 elif command.command == "stop":
                     print(f"Command: {command.command}")
                     self.__drone.stop()
@@ -197,7 +198,7 @@ class AWSTranscribeDroneController(DroneController):
                     self.__drone.turn(turn_rate)
                 elif command.command == "up":
                     print(f"Command: {command.command}")
-                    self.__drone.move_up(linear_rate)
+                    self.__drone.move_up(up_rate)
 
     def terminate(self) -> None:
         """Tell the controller to terminate."""
