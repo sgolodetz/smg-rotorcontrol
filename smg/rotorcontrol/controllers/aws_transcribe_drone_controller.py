@@ -89,16 +89,16 @@ class AWSTranscribeDroneController(DroneController):
                             "backward": "backward",
                             "down": "down",
                             "forward": "forward",
-                            "go straight": "go straight",
                             "land": "land",
-                            "level out": "level out",
+                            "level": "level",
                             "move left": "move left",
                             "move right": "move right",
-                            "take off": "take off",
-                            "up": "up",
+                            "rotate left": "rotate left",
+                            "rotate right": "rotate right",
                             "stop": "stop",
-                            "turn right": "turn right",
-                            "turn left": "turn left"
+                            "straight": "straight",
+                            "take off": "take off",
+                            "up": "up"
                         }
 
                         for voice, command in voice_to_command.items():
@@ -171,14 +171,11 @@ class AWSTranscribeDroneController(DroneController):
                 elif command.command == "forward":
                     print(f"Command: {command.command}")
                     self.__drone.move_forward(forward_rate)
-                elif command.command == "go straight":
-                    print(f"Command: {command.command}")
-                    self.__drone.turn(0.0)
                 elif command.command == "land":
                     print(f"Command: {command.command}")
                     self.__drone.stop()
                     self.__drone.land()
-                elif command.command == "level out":
+                elif command.command == "level":
                     print(f"Command: {command.command}")
                     self.__drone.move_up(0.0)
                 elif command.command == "move left":
@@ -187,15 +184,18 @@ class AWSTranscribeDroneController(DroneController):
                 elif command.command == "move right":
                     print(f"Command: {command.command}")
                     self.__drone.move_right(right_rate)
+                elif command.command == "rotate left":
+                    print(f"Command: {command.command}")
+                    self.__drone.turn(-turn_rate)
+                elif command.command == "rotate right":
+                    print(f"Command: {command.command}")
+                    self.__drone.turn(turn_rate)
                 elif command.command == "stop":
                     print(f"Command: {command.command}")
                     self.__drone.stop()
-                elif command.command == "turn left":
+                elif command.command == "straight":
                     print(f"Command: {command.command}")
-                    self.__drone.turn(-turn_rate)
-                elif command.command == "turn right":
-                    print(f"Command: {command.command}")
-                    self.__drone.turn(turn_rate)
+                    self.__drone.turn(0.0)
                 elif command.command == "up":
                     print(f"Command: {command.command}")
                     self.__drone.move_up(up_rate)
