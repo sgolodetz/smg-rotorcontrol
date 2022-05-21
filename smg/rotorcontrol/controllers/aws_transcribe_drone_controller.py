@@ -44,7 +44,7 @@ class AWSTranscribeDroneController(DroneController):
             """TODO"""
             return self.__command
 
-    class StreamHandler(TranscriptResultsStreamHandler):
+    class StreamHandler(TranscriptResultStreamHandler):
         """TODO"""
 
         # CONSTRUCTOR
@@ -92,6 +92,7 @@ class AWSTranscribeDroneController(DroneController):
                             "forward": "forward",
                             "go straight": "go straight",
                             "land": "land",
+                            "level out": "level out",
                             "move left": "move left",
                             "move right": "move right",
                             "take off": "take off",
@@ -107,7 +108,7 @@ class AWSTranscribeDroneController(DroneController):
 
     # CONSTRUCTOR
 
-    def __init__(self, drone: Drone):
+    def __init__(self, *, drone: Drone):
         """
         TODO
 
@@ -119,7 +120,6 @@ class AWSTranscribeDroneController(DroneController):
 
         self.__command_queue: Queue[AWSTranscribeDroneController.DroneCommand] = Queue()
         self.__drone: Drone = drone
-        self.__should_terminate: threading.Event = threading.Event()
         self.__transcription_gather: Optional[asyncio.Future] = None
 
         # Set up and start the transcription thread.
@@ -147,16 +147,61 @@ class AWSTranscribeDroneController(DroneController):
                                     is running (optional). Note that if the tracker is monocular, the transformation is
                                     unlikely to be scale-correct.
         """
-        # TODO
-        pass
+        linear_rate: float = 0.2
+        turn_rate: float = 0.2
+
+        while not self.__command_queue.empty():
+            command: AWSTranscribeDroneController.DroneCommand = self.__command_queue.get()
+            drone_state: Optional[Drone.EState] = self.__drone.get_state()
+            if drone_state is None:
+                raise RuntimeError("Error: The AWS Transcribe controller requires the drone's state to be available")
+
+            if drone_state == Drone.IDLE:
+                if command.command == "take off":
+                    print(f"Command: {command.command}")
+                    self.__drone.takeoff()
+            elif drone_state == Drone.FLYING:
+                if command.command == "back" or command.command == "backward":
+                    print(f"Command: {command.command}")
+                    self.__drone.move_forward(-linear_rate)
+                elif command.command == "down":
+                    print(f"Command: {command.command}")
+                    self.__drone.move_up(-linear_rate)
+                elif command.command == "forward":
+                    print(f"Command: {command.command}")
+                    self.__drone.move_forward(linear_rate)
+                elif command.command == "go straight":
+                    print(f"Command: {command.command}")
+                    self.__drone.turn(0.0)
+                elif command.command == "land":
+                    print(f"Command: {command.command}")
+                    self.__drone.stop()
+                    self.__drone.land()
+                elif command.command == "level out":
+                    print(f"Command: {command.command}")
+                    self.__drone.move_up(0.0)
+                elif command.command == "move left":
+                    print(f"Command: {command.command}")
+                    self.__drone.move_right(-linear_rate)
+                elif command.command == "move_right":
+                    print(f"Command: {command.command}")
+                    self.__drone.move_right(-linear_rate)
+                elif command.command == "stop":
+                    print(f"Command: {command.command}")
+                    self.__drone.stop()
+                elif command.command == "turn left":
+                    print(f"Command: {command.command}")
+                    self.__drone.turn(-turn_rate)
+                elif command.command == "turn right":
+                    print(f"Command: {command.command}")
+                    self.__drone.turn(turn_rate)
+                elif command.command == "up":
+                    print(f"Command: {command.command}")
+                    self.__drone.move_up(linear_rate)
 
     def terminate(self) -> None:
         """Tell the controller to terminate."""
         if self.__alive:
-            # Set the termination flag if it isn't set already.
-            if not self.__should_terminate.is_set():
-                self.__should_terminate.set()
-
             # Stop any ongoing transcription.
             if self.__transcription_gather is not None:
                 self.__transcription_gather.cancel()
@@ -217,6 +262,7 @@ class AWSTranscribeDroneController(DroneController):
         # the audio formats described for the source language you'll be using:
         # https://docs.aws.amazon.com/transcribe/latest/dg/streaming.html
         stream = sounddevice.RawInputStream(
+            device=10,
             channels=1,
             samplerate=16000,
             callback=callback,

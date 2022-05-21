@@ -1,3 +1,4 @@
+from .controllers.aws_transcribe_drone_controller import AWSTranscribeDroneController
 from .controllers.drone_controller import DroneController
 from .controllers.futaba_t6k_drone_controller import FutabaT6KDroneController
 from .controllers.keyboard_drone_controller import KeyboardDroneController
@@ -19,7 +20,9 @@ class DroneControllerFactory:
         :param kwargs:          Any keyword arguments to pass to the drone controller constructor.
         :return:                The drone controller.
         """
-        if controller_type == "futaba_t6k":
+        if controller_type == "aws_transcribe":
+            return AWSTranscribeDroneController(**kwargs)
+        elif controller_type == "futaba_t6k":
             return FutabaT6KDroneController(**kwargs)
         elif controller_type == "keyboard":
             return KeyboardDroneController(**kwargs)
