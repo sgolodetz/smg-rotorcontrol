@@ -12,7 +12,7 @@ from typing import Callable, Dict, List, Optional, Set, Tuple
 
 from amazon_transcribe.client import TranscribeStreamingClient
 from amazon_transcribe.handlers import TranscriptResultStream, TranscriptResultStreamHandler
-from amazon_transcribe.model import Result, TranscriptEvent
+from amazon_transcribe.model import Result, StartStreamTranscriptionEventStream, TranscriptEvent
 
 from smg.rotory.drones import Drone
 
@@ -24,16 +24,16 @@ class AWSTranscribeDroneController(DroneController):
 
     # NESTED TYPES
 
-    class StreamHandler(TranscriptResultStreamHandler):
-        """A handler that can handle transcript events from a stream processed by AWS Transcribe."""
+    class ResultStreamHandler(TranscriptResultStreamHandler):
+        """A handler that can handle transcript events received in a result stream from AWS Transcribe."""
 
         # CONSTRUCTOR
 
         def __init__(self, stream: TranscriptResultStream, command_queue: "Queue[str]", *, debug: bool = True):
             """
-            Construct a handler that can handle transcript events from a stream processed by AWS Transcribe.
+            Construct a handler that can handle transcript events received in a result stream from AWS Transcribe.
 
-            :param stream:          The stream.
+            :param stream:          The result stream.
             :param command_queue:   The queue onto which to push any recognised drone commands.
             :param debug:           Whether or not to print out debug messages.
             """
@@ -46,7 +46,7 @@ class AWSTranscribeDroneController(DroneController):
 
         async def handle_transcript_event(self, transcript_event: TranscriptEvent) -> None:
             """
-            Handle a transcript event from a stream processed by AWS Transcribe.
+            Handle a transcript event received in a result stream from AWS Transcribe.
 
             :param transcript_event:    The event.
             """
@@ -184,7 +184,7 @@ class AWSTranscribeDroneController(DroneController):
     # PRIVATE METHODS
 
     def __run_transcription(self) -> None:
-        """Transcribe audio from the user using AWS Transcribe."""
+        """Transcribe audio from the user using AWS Transcribe (runs the asyncio event loop)."""
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
@@ -216,28 +216,27 @@ class AWSTranscribeDroneController(DroneController):
                 yield await input_queue.get()
 
     async def __run_transcription_async(self) -> None:
+        """Transcribe audio from the user using AWS Transcribe (runs within the asyncio event loop)."""
         # Set up the AWS Transcribe streaming client.
         client = TranscribeStreamingClient(region="eu-west-1")
 
-        # Start transcription to generate our async stream
-        stream = await client.start_stream_transcription(
-            language_code="en-US",
-            media_sample_rate_hz=16000,
-            media_encoding="pcm",
+        # Start the stream that will be used to send audio chunks to AWS Transcribe for processing.
+        stream: StartStreamTranscriptionEventStream = await client.start_stream_transcription(
             enable_partial_results_stabilization=True,
+            language_code="en-US",
+            media_encoding="pcm",
+            media_sample_rate_hz=16000,
             partial_results_stability="high"
         )
 
-        # Instantiate our handler and start processing events
-        handler = AWSTranscribeDroneController.StreamHandler(stream.output_stream, self.__command_queue)
-        self.__transcription_gather = asyncio.gather(
-            self.__write_chunks(stream), handler.handle_events()
-        )
+        # Construct our result stream handler and start processing transcript events.
+        handler = AWSTranscribeDroneController.ResultStreamHandler(stream.output_stream, self.__command_queue)
+        self.__transcription_gather = asyncio.gather(self.__write_chunks(stream), handler.handle_events())
         await self.__transcription_gather
 
-    async def __write_chunks(self, stream):
-        # This connects the raw audio chunks generator coming from the microphone
-        # and passes them along to the transcription stream.
+    async def __write_chunks(self, stream: StartStreamTranscriptionEventStream):
+        """Write audio chunks captured by the microphone to the transcription stream."""
         async for chunk, status in self.__mic_stream():
             await stream.input_stream.send_audio_event(audio_chunk=chunk)
+
         await stream.input_stream.end_stream()
