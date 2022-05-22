@@ -29,7 +29,7 @@ class AWSTranscribeDroneController(DroneController):
 
         # CONSTRUCTOR
 
-        def __init__(self, stream: TranscriptResultStream, command_queue: Queue[str], *, debug: bool = True):
+        def __init__(self, stream: TranscriptResultStream, command_queue: "Queue[str]", *, debug: bool = True):
             """
             TODO
 
@@ -39,7 +39,7 @@ class AWSTranscribeDroneController(DroneController):
             """
             super().__init__(stream)
 
-            self.__command_queue: Queue[str] = command_queue
+            self.__command_queue: "Queue[str]" = command_queue
             self.__debug: bool = debug
 
         # PUBLIC ASYNCHRONOUS METHODS
@@ -101,14 +101,14 @@ class AWSTranscribeDroneController(DroneController):
         self.__alive: bool = False
 
         # TODO: Comment here.
-        self.__command_queue: Queue[str] = Queue[str]()
+        self.__command_queue: "Queue[str]" = Queue()
         self.__drone: Drone = drone
         self.__transcription_gather: Optional[asyncio.Future] = None
 
         # TODO: Comment here.
         self.__forward_rate: float = 0.2
         self.__right_rate: float = 0.2
-        self.__turn_rate: float = 0.2
+        self.__turn_rate: float = 0.1
         self.__up_rate: float = 0.1
 
         # Set up and start the transcription thread.
@@ -257,7 +257,7 @@ class AWSTranscribeDroneController(DroneController):
         # the audio formats described for the source language you'll be using:
         # https://docs.aws.amazon.com/transcribe/latest/dg/streaming.html
         stream = sounddevice.RawInputStream(
-            device=10,
+            device=1,
             channels=1,
             samplerate=16000,
             callback=callback,
