@@ -8,7 +8,7 @@ import sounddevice
 import threading
 
 from queue import Queue
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Callable, Dict, List, Optional, Set, Tuple
 
 from amazon_transcribe.client import TranscribeStreamingClient
 from amazon_transcribe.handlers import TranscriptResultStream, TranscriptResultStreamHandler
@@ -65,14 +65,14 @@ class AWSTranscribeDroneController(DroneController):
 
                     # If we're debugging, print out both the transcription and the time it took to compute it.
                     if self.__debug:
-                        print("Transcription: ", transcript)
-                        compute_time: float = result.end_time - result.start_time
-                        print("Compute Time (s): ", round(compute_time, 3))
+                        compute_time: float = round(result.end_time - result.start_time, 3)
+                        partiality: str = "partial" if result.is_partial else "full"
+                        print(f"Transcription: {transcript} ({compute_time}s; {partiality})")
 
                     # Add any relevant drone commands that have been found in the audio stream to the command queue.
                     possible_commands: Set[str] = {
                         "back", "backward", "down",  "forward", "land", "level", "move left", "move right",
-                        "rotate left", "rotate right", "stop", "straight", "take off", "up"
+                        "stop", "straight", "take off", "turn left", "turn right", "up"
                     }
 
                     for command in possible_commands:
@@ -92,13 +92,12 @@ class AWSTranscribeDroneController(DroneController):
 
         self.__alive: bool = False
 
-        # TODO: Comment here.
         self.__audio_input_device: Optional[int] = audio_input_device
         self.__command_queue: "Queue[str]" = Queue()
         self.__drone: Drone = drone
         self.__transcription_gather: Optional[asyncio.Future] = None
 
-        # TODO: Comment here.
+        # Set the linear and angular rates to use when controlling the drone.
         self.__forward_rate: float = 0.2
         self.__right_rate: float = 0.2
         self.__turn_rate: float = 0.1
@@ -143,49 +142,32 @@ class AWSTranscribeDroneController(DroneController):
                 raise RuntimeError("Error: The AWS Transcribe controller requires the drone's state to be available")
 
             # Try to run any commands that can be executed in the drone's current state.
-            # TODO: Clean this up.
-            if drone_state == Drone.IDLE:
-                if command == "take off":
-                    print(f"Command: {command}")
-                    self.__drone.takeoff()
-            elif drone_state == Drone.FLYING:
-                if command == "back" or command == "backward":
-                    print(f"Command: {command}")
-                    self.__drone.move_forward(-self.__forward_rate)
-                elif command == "down":
-                    print(f"Command: {command}")
-                    self.__drone.move_up(-self.__up_rate)
-                elif command == "forward":
-                    print(f"Command: {command}")
-                    self.__drone.move_forward(self.__forward_rate)
-                elif command == "land":
-                    print(f"Command: {command}")
-                    self.__drone.stop()
-                    self.__drone.land()
-                elif command == "level":
-                    print(f"Command: {command}")
-                    self.__drone.move_up(0.0)
-                elif command == "move left":
-                    print(f"Command: {command}")
-                    self.__drone.move_right(-self.__right_rate)
-                elif command == "move right":
-                    print(f"Command: {command}")
-                    self.__drone.move_right(self.__right_rate)
-                elif command == "rotate left":
-                    print(f"Command: {command}")
-                    self.__drone.turn(-self.__turn_rate)
-                elif command == "rotate right":
-                    print(f"Command: {command}")
-                    self.__drone.turn(self.__turn_rate)
-                elif command == "stop":
-                    print(f"Command: {command}")
-                    self.__drone.stop()
-                elif command == "straight":
-                    print(f"Command: {command}")
-                    self.__drone.turn(0.0)
-                elif command == "up":
-                    print(f"Command: {command}")
-                    self.__drone.move_up(self.__up_rate)
+            command_runners: Dict[Drone.EState, List[Tuple[List[str], Callable[[], None]]]] = {
+                Drone.IDLE: [
+                    (["take off"], lambda: self.__drone.takeoff())
+                ],
+                Drone.FLYING: [
+                    (["back", "backward"], lambda: self.__drone.move_forward(-self.__forward_rate)),
+                    (["down"], lambda: self.__drone.move_up(-self.__up_rate)),
+                    (["forward"], lambda: self.__drone.move_forward(self.__forward_rate)),
+                    (["land"], lambda: [self.__drone.stop(), self.__drone.land()]),
+                    (["level"], lambda: self.__drone.move_up(0.0)),
+                    (["move left"], lambda: self.__drone.move_right(-self.__right_rate)),
+                    (["move right"], lambda: self.__drone.move_right(self.__right_rate)),
+                    (["stop"], lambda: self.__drone.stop()),
+                    (["straight"], lambda: self.__drone.turn(0.0)),
+                    (["turn left"], lambda: self.__drone.turn(-self.__turn_rate)),
+                    (["turn right"], lambda: self.__drone.turn(self.__turn_rate)),
+                    (["up"], lambda: self.__drone.move_up(self.__up_rate))
+                ]
+            }
+
+            for required_state, command_runners_for_state in command_runners.items():
+                if drone_state == required_state:
+                    for commands, command_runner in command_runners_for_state:
+                        if command in commands:
+                            print(f"Command: {command}")
+                            command_runner()
 
     def terminate(self) -> None:
         """Tell the controller to terminate."""
@@ -202,12 +184,14 @@ class AWSTranscribeDroneController(DroneController):
     # PRIVATE METHODS
 
     def __run_transcription(self) -> None:
-        # TODO: Comment this.
+        """Transcribe audio from the user using AWS Transcribe."""
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
+
         try:
             loop.run_until_complete(self.__run_transcription_async())
         except:
+            # FIXME: Investigate what types of exception (if any) are actually being caught here.
             pass
         finally:
             loop.close()
