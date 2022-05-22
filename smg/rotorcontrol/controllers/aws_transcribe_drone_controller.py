@@ -199,31 +199,21 @@ class AWSTranscribeDroneController(DroneController):
     # PRIVATE ASYNCHRONOUS METHODS
 
     async def __mic_stream(self):
-        # This function wraps the raw input stream from the microphone forwarding
-        # the blocks to an asyncio.Queue.
+        """Asynchronously yield audio chunks from the microphone as they become available."""
         loop = asyncio.get_event_loop()
         input_queue = asyncio.Queue()
 
+        # noinspection PyUnusedLocal
         def callback(indata, frame_count, time_info, status):
             loop.call_soon_threadsafe(input_queue.put_nowait, (bytes(indata), status))
 
-        # Be sure to use the correct parameters for the audio stream that matches
-        # the audio formats described for the source language you'll be using:
-        # https://docs.aws.amazon.com/transcribe/latest/dg/streaming.html
-        stream = sounddevice.RawInputStream(
-            device=self.__audio_input_device,
-            channels=1,
-            samplerate=16000,
-            callback=callback,
-            blocksize=1024 * 2,
-            dtype="int16",
-        )
-        # Initiate the audio stream and asynchronously yield the audio chunks
-        # as they become available.
-        with stream:
+        # Initiate the audio stream, and asynchronously yield the audio chunks as they become available.
+        with sounddevice.RawInputStream(
+            blocksize=1024 * 2, callback=callback, channels=1, device=self.__audio_input_device,
+            dtype="int16", samplerate=16000
+        ):
             while True:
-                indata, status = await input_queue.get()
-                yield indata, status
+                yield await input_queue.get()
 
     async def __run_transcription_async(self) -> None:
         # Set up the AWS Transcribe streaming client.
