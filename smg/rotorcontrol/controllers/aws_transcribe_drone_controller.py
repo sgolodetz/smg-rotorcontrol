@@ -29,7 +29,7 @@ class AWSTranscribeDroneController(DroneController):
 
         # CONSTRUCTOR
 
-        def __init__(self, stream: TranscriptResultStream, command_queue: "Queue[str]", *, debug: bool = True):
+        def __init__(self, stream: TranscriptResultStream, command_queue: "Queue[str]", *, debug: bool):
             """
             Construct a handler that can handle transcript events received in a result stream from AWS Transcribe.
 
@@ -50,7 +50,8 @@ class AWSTranscribeDroneController(DroneController):
 
             :param transcript_event:    The event.
             """
-            # Get a list of transcription results, each of which corresponds to a portion of the input audio stream.
+            # Get the transcription results associated with the event, each of which corresponds to a portion of the
+            # input audio stream.
             results: List[Result] = transcript_event.transcript.results
 
             # For each transcription result:
@@ -81,12 +82,19 @@ class AWSTranscribeDroneController(DroneController):
 
     # CONSTRUCTOR
 
-    def __init__(self, *, audio_input_device: Optional[int] = None, drone: Drone):
+    def __init__(self, *, audio_input_device: Optional[int] = None, debug: bool = False, drone: Drone,
+                 forward_rate: float = 0.2, right_rate: float = 0.2, turn_rate: float = 0.15, up_rate: float = 0.1):
         """
         Construct an AWS Transcribe-based flight controller for a drone.
 
-        :param audio_input_device:  The index of the device to use for audio input.
+        :param audio_input_device:  The index of the device to use for audio input (if None, the default device will
+                                    be used).
+        :param debug:               Whether or not to print out debug messages.
         :param drone:               The drone.
+        :param forward_rate:        The rate at which the drone should move forward (in [-1,1]).
+        :param right_rate:          The rate at which the drone should move to the right (in [-1,1]).
+        :param turn_rate:           The rate at which the drone should turn (in [-1,1]).
+        :param up_rate:             The rate at which the drone should move up (in [-1,1]).
         """
         super().__init__()
 
@@ -94,14 +102,15 @@ class AWSTranscribeDroneController(DroneController):
 
         self.__audio_input_device: Optional[int] = audio_input_device
         self.__command_queue: "Queue[str]" = Queue()
+        self.__debug: bool = debug
         self.__drone: Drone = drone
         self.__transcription_gather: Optional[asyncio.Future] = None
 
         # Set the linear and angular rates to use when controlling the drone.
-        self.__forward_rate: float = 0.2
-        self.__right_rate: float = 0.2
-        self.__turn_rate: float = 0.1
-        self.__up_rate: float = 0.1
+        self.__forward_rate: float = forward_rate
+        self.__right_rate: float = right_rate
+        self.__turn_rate: float = turn_rate
+        self.__up_rate: float = up_rate
 
         # Set up and start the transcription thread.
         self.__transcription_thread: threading.Thread = threading.Thread(target=self.__run_transcription)
@@ -166,8 +175,9 @@ class AWSTranscribeDroneController(DroneController):
                 if drone_state == required_state:
                     for commands, command_runner in command_runners_for_state:
                         if command in commands:
-                            print(f"Command: {command}")
                             command_runner()
+                            if self.__debug:
+                                print(f"Command: {command}")
 
     def terminate(self) -> None:
         """Tell the controller to terminate."""
@@ -188,11 +198,12 @@ class AWSTranscribeDroneController(DroneController):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
+        # noinspection PyBroadException
         try:
             loop.run_until_complete(self.__run_transcription_async())
-        except:
-            # FIXME: Investigate what types of exception (if any) are actually being caught here.
-            pass
+        except Exception as e:
+            # Suppress any exceptions that occur - if voice transcription fails, it fails.
+            print(f"Error: {e}")
         finally:
             loop.close()
 
@@ -205,7 +216,10 @@ class AWSTranscribeDroneController(DroneController):
 
         # noinspection PyUnusedLocal
         def callback(indata, frame_count, time_info, status):
-            loop.call_soon_threadsafe(input_queue.put_nowait, (bytes(indata), status))
+            try:
+                loop.call_soon_threadsafe(input_queue.put_nowait, (bytes(indata), status))
+            except RuntimeError as e:
+                pass
 
         # Initiate the audio stream, and asynchronously yield the audio chunks as they become available.
         with sounddevice.RawInputStream(
@@ -229,8 +243,12 @@ class AWSTranscribeDroneController(DroneController):
             partial_results_stability="high"
         )
 
-        # Construct our result stream handler and start processing transcript events.
-        handler = AWSTranscribeDroneController.ResultStreamHandler(stream.output_stream, self.__command_queue)
+        # Construct the result stream handler.
+        handler = AWSTranscribeDroneController.ResultStreamHandler(
+            stream.output_stream, self.__command_queue, debug=self.__debug
+        )
+
+        # Start processing transcript events.
         self.__transcription_gather = asyncio.gather(self.__write_chunks(stream), handler.handle_events())
         await self.__transcription_gather
 
