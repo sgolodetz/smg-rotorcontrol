@@ -7,6 +7,7 @@ import pygame
 import sounddevice
 import threading
 
+from collections import OrderedDict
 from queue import Queue
 from typing import Callable, Dict, List, Optional, Set, Tuple
 
@@ -41,6 +42,7 @@ class AWSTranscribeDroneController(DroneController):
 
             self.__command_queue: "Queue[str]" = command_queue
             self.__debug: bool = debug
+            self.__read_to: int = 0
 
         # PUBLIC ASYNCHRONOUS METHODS
 
@@ -68,7 +70,8 @@ class AWSTranscribeDroneController(DroneController):
                     if self.__debug:
                         compute_time: float = round(result.end_time - result.start_time, 3)
                         partiality: str = "partial" if result.is_partial else "full"
-                        print(f"Transcription: {transcript} ({compute_time}s; {partiality})")
+                        stylised_transcript: str = ('-' * self.__read_to) + transcript[self.__read_to:]
+                        print(f"Transcription: {stylised_transcript} ({compute_time}s; {partiality})")
 
                     # Add any relevant drone commands that have been found in the audio stream to the command queue.
                     possible_commands: Set[str] = {
@@ -76,9 +79,19 @@ class AWSTranscribeDroneController(DroneController):
                         "stop", "straight", "take off", "turn left", "turn right", "up"
                     }
 
-                    for command in possible_commands:
-                        if command in transcript:
+                    command_starts: OrderedDict[int, str] = OrderedDict(
+                        sorted({transcript.find(c): c for c in possible_commands}.items())
+                    )
+                    command_starts.pop(-1, None)
+
+                    for start, command in command_starts.items():
+                        if start >= self.__read_to:
                             self.__command_queue.put(command)
+                            self.__read_to = start + len(command)
+
+                # TODO: Comment here.
+                if not result.is_partial:
+                    self.__read_to = 0
 
     # CONSTRUCTOR
 
@@ -201,11 +214,16 @@ class AWSTranscribeDroneController(DroneController):
         # noinspection PyBroadException
         try:
             loop.run_until_complete(self.__run_transcription_async())
-        except Exception as e:
+        except Exception:
             # Suppress any exceptions that occur - if voice transcription fails, it fails.
-            print(f"Error: {e}")
+            pass
         finally:
-            loop.close()
+            # noinspection PyBroadException
+            try:
+                loop.close()
+            except Exception:
+                # Also suppress any exceptions that occur when trying to close the event loop.
+                pass
 
     # PRIVATE ASYNCHRONOUS METHODS
 
