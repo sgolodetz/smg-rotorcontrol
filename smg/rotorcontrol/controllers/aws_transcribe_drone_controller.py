@@ -77,7 +77,7 @@ class AWSTranscribeDroneController(DroneController):
                     # Make a list of all of the possible drone commands that we want to recognise.
                     possible_commands: Set[str] = {
                         "back", "backward", "down",  "forward", "land", "level", "move left", "move right",
-                        "stop", "straight", "take off", "turn left", "turn right", "up"
+                        "stop", "straight", "take off", "takeoff", "turn left", "turn right", "up"
                     }
 
                     # Search for commands in the transcript, and order them by their start points.
@@ -174,7 +174,7 @@ class AWSTranscribeDroneController(DroneController):
             # Try to run any commands that can be executed in the drone's current state.
             command_runners: Dict[Drone.EState, List[Tuple[List[str], Callable[[], None]]]] = {
                 Drone.IDLE: [
-                    (["take off"], lambda: self.__drone.takeoff())
+                    (["take off", "takeoff"], lambda: self.__drone.takeoff())
                 ],
                 Drone.FLYING: [
                     (["back", "backward"], lambda: self.__drone.move_forward(-self.__forward_rate)),
