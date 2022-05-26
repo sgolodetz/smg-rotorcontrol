@@ -71,8 +71,8 @@ class AWSTranscribeDroneController(DroneController):
                     if self.__debug:
                         compute_time: float = round(result.end_time - result.start_time, 3)
                         partiality: str = "partial" if result.is_partial else "full"
-                        stylised_transcript: str = ('-' * self.__read_to) + transcript[self.__read_to:]
-                        print(f"Transcription: {stylised_transcript} ({compute_time}s; {partiality})")
+                        masked_transcript: str = ('-' * self.__read_to) + transcript[self.__read_to:]
+                        print(f"Transcription: {masked_transcript} ({compute_time}s; {partiality})")
 
                     # Make a list of all of the possible drone commands that we want to recognise.
                     possible_commands: Set[str] = {
