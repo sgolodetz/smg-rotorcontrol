@@ -7,6 +7,7 @@ import pygame
 import sounddevice
 import threading
 
+from collections import OrderedDict
 from queue import Queue
 from typing import Callable, Dict, List, Optional, Set, Tuple
 
@@ -41,6 +42,7 @@ class AWSTranscribeDroneController(DroneController):
 
             self.__command_queue: "Queue[str]" = command_queue
             self.__debug: bool = debug
+            self.__read_to: int = 0
 
         # PUBLIC ASYNCHRONOUS METHODS
 
@@ -65,20 +67,39 @@ class AWSTranscribeDroneController(DroneController):
                     transcript = "".join(filter(lambda c: str.isalnum(c) or str.isspace(c), transcript))
 
                     # If we're debugging, print out both the transcription and the time it took to compute it.
+                    # Note that we mask out bits of the transcription that have already been read with dashes.
                     if self.__debug:
                         compute_time: float = round(result.end_time - result.start_time, 3)
                         partiality: str = "partial" if result.is_partial else "full"
-                        print(f"Transcription: {transcript} ({compute_time}s; {partiality})")
+                        masked_transcript: str = ('-' * self.__read_to) + transcript[self.__read_to:]
+                        print(f"Transcription: {masked_transcript} ({compute_time}s; {partiality})")
 
-                    # Add any relevant drone commands that have been found in the audio stream to the command queue.
+                    # Make a list of all of the possible drone commands that we want to recognise.
                     possible_commands: Set[str] = {
                         "back", "backward", "down",  "forward", "land", "level", "move left", "move right",
-                        "stop", "straight", "take off", "turn left", "turn right", "up"
+                        "stop", "straight", "take off", "takeoff", "turn left", "turn right", "up"
                     }
 
-                    for command in possible_commands:
-                        if command in transcript:
+                    # Search for commands in the transcript, and order them by their start points.
+                    command_starts: OrderedDict[int, str] = OrderedDict(
+                        sorted({transcript.find(c): c for c in possible_commands}.items())
+                    )
+                    command_starts.pop(-1, None)
+
+                    # For each command found in the transcript:
+                    for start, command in command_starts.items():
+                        # If it starts beyond the point to which we've read:
+                        if start >= self.__read_to:
+                            # Add it to the command queue.
                             self.__command_queue.put(command)
+
+                            # Update the point to which we've read.
+                            self.__read_to = start + len(command)
+
+                # If this is a full transcription result, reset the point to which we've read in preparation for
+                # a completely new incoming transcription next time.
+                if not result.is_partial:
+                    self.__read_to = 0
 
     # CONSTRUCTOR
 
@@ -153,7 +174,7 @@ class AWSTranscribeDroneController(DroneController):
             # Try to run any commands that can be executed in the drone's current state.
             command_runners: Dict[Drone.EState, List[Tuple[List[str], Callable[[], None]]]] = {
                 Drone.IDLE: [
-                    (["take off"], lambda: self.__drone.takeoff())
+                    (["take off", "takeoff"], lambda: self.__drone.takeoff())
                 ],
                 Drone.FLYING: [
                     (["back", "backward"], lambda: self.__drone.move_forward(-self.__forward_rate)),
@@ -201,11 +222,16 @@ class AWSTranscribeDroneController(DroneController):
         # noinspection PyBroadException
         try:
             loop.run_until_complete(self.__run_transcription_async())
-        except Exception as e:
+        except Exception:
             # Suppress any exceptions that occur - if voice transcription fails, it fails.
-            print(f"Error: {e}")
+            pass
         finally:
-            loop.close()
+            # noinspection PyBroadException
+            try:
+                loop.close()
+            except Exception:
+                # Also suppress any exceptions that occur when trying to close the event loop.
+                pass
 
     # PRIVATE ASYNCHRONOUS METHODS
 

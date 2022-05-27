@@ -49,7 +49,7 @@ class LandingDroneController(DroneController):
 
             # If that succeeded, set the expected end position to one voxel above the centre of the patch.
             if ground_vpos is not None:
-                resolution: float = self.__planning_toolkit.get_tree().get_resolution()
+                resolution: float = self.__planning_toolkit.get_tree_resolution()
                 self.__expected_end_pos = ground_vpos + np.array([0.0, -resolution, 0.0])
 
             # Otherwise, set the expected end position to be equal to the expected start position. One rationale
