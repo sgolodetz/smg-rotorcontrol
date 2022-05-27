@@ -19,6 +19,7 @@ from smg.rotory.drones import Drone
 from .drone_controller import DroneController
 from .landing_drone_controller import LandingDroneController
 from .ppn_drone_controller import PPNDroneController
+from .rate_calibration_drone_controller import RateCalibrationDroneController
 from .takeoff_drone_controller import TakeoffDroneController
 from .traverse_waypoints_drone_controller import TraverseWaypointsDroneController
 
@@ -384,6 +385,13 @@ class RTSStyleDroneController(DroneController):
                 ppn_controller: PPNDroneController = PPNDroneController(drone=self.__drone)
                 ppn_controller.set_target_pos(self.__goal_pos)
                 new_controller = ppn_controller
+
+        # Otherwise, if the user is pressing the 'r' key:
+        elif event.type == pygame.KEYDOWN and event.key == pygame.K_r:
+            # If the current drone state is either unknown or 'flying':
+            if drone_state is None or drone_state == Drone.FLYING:
+                # Make a new rate calibration controller.
+                new_controller = RateCalibrationDroneController(drone=self.__drone)
 
         # If a new controller has been constructed:
         if new_controller is not None:
