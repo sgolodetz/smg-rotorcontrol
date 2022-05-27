@@ -7,6 +7,7 @@ import pygame
 import vg
 
 from OpenGL.GL import *
+from timeit import default_timer as timer
 from typing import Any, Dict, List, Optional, Tuple
 
 from smg.opengl import OpenGLUtil
@@ -32,9 +33,12 @@ class RateCalibrationDroneController(DroneController):
 
         self.__drone: Drone = drone
         self.__durations: Dict[str, Dict[str, float]] = collections.defaultdict(dict)
+        self.__flight_time: float = 0.0
         self.__maxs: Optional[np.ndarray] = None
         self.__mins: Optional[np.ndarray] = None
         self.__origin: Optional[np.ndarray] = None
+        self.__previous_in_bounds: bool = False
+        self.__previous_time: Optional[float] = None
         self.__rate_idx: int = 0
         self.__rates: np.ndarray = np.linspace(0.3, 0.1, 5, endpoint=True)
         self.__stage: int = 0
@@ -117,45 +121,30 @@ class RateCalibrationDroneController(DroneController):
             signed_rate: float = sign * self.__rates[self.__rate_idx]
 
             if self.__which == "forward":
+                self.__update_flight_time(cam, axis=2)
+
                 if self.__stage == 1 and cam.p()[2] >= self.__maxs[2]:
                     self.__stage = 2
                 elif self.__stage == 2 and cam.p()[2] <= self.__mins[2]:
-                    self.__drone.stop()
-                    self.__stage = 0
-
-                    if self.__rate_idx + 1 < len(self.__rates):
-                        self.__rate_idx += 1
-                    else:
-                        self.__rate_idx = 0
-                        self.__which = "right"
+                    self.__finish_rate("right")
                 else:
                     self.__drone.move_forward(signed_rate)
             elif self.__which == "right":
+                self.__update_flight_time(cam, axis=2)
+
                 if self.__stage == 1 and cam.p()[2] >= self.__maxs[2]:
                     self.__stage = 2
                 elif self.__stage == 2 and cam.p()[2] <= self.__mins[2]:
-                    self.__drone.stop()
-                    self.__stage = 0
-
-                    if self.__rate_idx + 1 < len(self.__rates):
-                        self.__rate_idx += 1
-                    else:
-                        self.__rate_idx = 0
-                        self.__which = "up"
+                    self.__finish_rate("up")
                 else:
                     self.__drone.move_right(signed_rate)
             elif self.__which == "up":
+                self.__update_flight_time(cam, axis=1)
+
                 if self.__stage == 1 and cam.p()[1] <= self.__mins[1]:
                     self.__stage = 2
                 elif self.__stage == 2 and cam.p()[1] >= self.__maxs[1]:
-                    self.__drone.stop()
-                    self.__stage = 0
-
-                    if self.__rate_idx + 1 < len(self.__rates):
-                        self.__rate_idx += 1
-                    else:
-                        self.__rate_idx = 0
-                        self.__which = ""
+                    self.__finish_rate("")
                 else:
                     self.__drone.move_up(signed_rate)
 
@@ -168,3 +157,31 @@ class RateCalibrationDroneController(DroneController):
         glColor3f(1, 0, 0)
         OpenGLUtil.render_aabb(self.__mins, self.__maxs)
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
+
+    # PRIVATE METHODS
+
+    def __finish_rate(self, next_which: str) -> None:
+        self.__drone.stop()
+        self.__stage = 0
+
+        print(f"{self.__which}, {self.__rates[self.__rate_idx]}, {self.__flight_time}s")
+
+        self.__flight_time = 0.0
+        self.__previous_in_bounds = False
+        self.__previous_time = None
+
+        if self.__rate_idx + 1 < len(self.__rates):
+            self.__rate_idx += 1
+        else:
+            self.__rate_idx = 0
+            self.__which = next_which
+
+    def __update_flight_time(self, cam: SimpleCamera, *, axis: int) -> None:
+        current_time: float = timer()
+        current_in_bounds: bool = self.__mins[axis] <= cam.p()[axis] <= self.__maxs[axis]
+
+        if current_in_bounds and self.__previous_in_bounds:
+            self.__flight_time += current_time - self.__previous_time
+
+        self.__previous_in_bounds = current_in_bounds
+        self.__previous_time = current_time
