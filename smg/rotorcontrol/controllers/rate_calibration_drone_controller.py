@@ -36,7 +36,7 @@ class RateCalibrationDroneController(DroneController):
         self.__mins: Optional[np.ndarray] = None
         self.__origin: Optional[np.ndarray] = None
         self.__rate_idx: int = 0
-        self.__rates: np.ndarray = np.linspace(0.1, 0.3, 5, endpoint=True)
+        self.__rates: np.ndarray = np.linspace(0.3, 0.1, 5, endpoint=True)
         self.__stage: int = 0
         self.__which: str = "forward"
 
@@ -120,7 +120,9 @@ class RateCalibrationDroneController(DroneController):
                 if self.__stage == 1 and cam.p()[2] >= self.__maxs[2]:
                     self.__stage = 2
                 elif self.__stage == 2 and cam.p()[2] <= self.__mins[2]:
+                    self.__drone.stop()
                     self.__stage = 0
+
                     if self.__rate_idx + 1 < len(self.__rates):
                         self.__rate_idx += 1
                     else:
@@ -132,7 +134,9 @@ class RateCalibrationDroneController(DroneController):
                 if self.__stage == 1 and cam.p()[2] >= self.__maxs[2]:
                     self.__stage = 2
                 elif self.__stage == 2 and cam.p()[2] <= self.__mins[2]:
+                    self.__drone.stop()
                     self.__stage = 0
+
                     if self.__rate_idx + 1 < len(self.__rates):
                         self.__rate_idx += 1
                     else:
@@ -144,10 +148,13 @@ class RateCalibrationDroneController(DroneController):
                 if self.__stage == 1 and cam.p()[1] <= self.__mins[1]:
                     self.__stage = 2
                 elif self.__stage == 2 and cam.p()[1] >= self.__maxs[1]:
+                    self.__drone.stop()
                     self.__stage = 0
+
                     if self.__rate_idx + 1 < len(self.__rates):
                         self.__rate_idx += 1
                     else:
+                        self.__rate_idx = 0
                         self.__which = ""
                 else:
                     self.__drone.move_up(signed_rate)
