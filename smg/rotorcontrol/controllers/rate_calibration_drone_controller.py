@@ -32,7 +32,7 @@ class RateCalibrationDroneController(DroneController):
         super().__init__()
 
         self.__drone: Drone = drone
-        self.__durations: Dict[str, Dict[str, float]] = collections.defaultdict(dict)
+        # self.__durations: Dict[str, Dict[str, float]] = collections.defaultdict(dict)
         self.__flight_time: float = 0.0
         self.__maxs: Optional[np.ndarray] = None
         self.__mins: Optional[np.ndarray] = None
@@ -67,7 +67,10 @@ class RateCalibrationDroneController(DroneController):
         # forwarded on to the subsidiary iterate functions.
         kwargs: Dict[str, Any] = {key: value for key, value in locals().items() if key != "self"}
 
-        # FIXME: Make sure that tracker_c_t_i is not None.
+        # If no tracker pose has been passed in, stop the drone and early out.
+        if tracker_c_t_i is None:
+            self.__drone.stop()
+            return
 
         # TODO: Comment here.
         if self.__which == "":
