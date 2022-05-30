@@ -394,6 +394,7 @@ class RTSStyleDroneController(DroneController):
             picked_pos = picking_image[my, mx]
             picked_pos = self.__planning_toolkit.pos_to_vpos(picked_pos)
             floating_pos = picked_pos + np.array([0, -self.__height_offset, 0])
+            floating_pos = self.__planning_toolkit.pos_to_vpos(floating_pos)
 
         # If the left mouse button is pressed:
         if pygame.mouse.get_pressed(num_buttons=3)[0]:
