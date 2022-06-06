@@ -40,7 +40,7 @@ class RateCalibrationDroneController(DroneController):
         self.__previous_in_bounds: bool = False
         self.__previous_time: Optional[float] = None
         self.__rate_idx: int = 0
-        self.__rates: np.ndarray = np.linspace(0.3, 0.1, 5, endpoint=True)
+        self.__rates: np.ndarray = np.array([0.5])  # np.linspace(0.3, 0.1, 5, endpoint=True)
         self.__stage: int = 0
         self.__which: str = "forward"
 
@@ -105,7 +105,7 @@ class RateCalibrationDroneController(DroneController):
             # Determine the angle by which the drone needs to turn to achieve the target orientation.
             angle: float = sign * np.arccos(np.clip(np.dot(current_n, target_n), -1.0, 1.0))
 
-            if np.fabs(angle) > 2.0 * np.pi / 180:
+            if np.fabs(angle) > 5.0 * np.pi / 180:
                 # Determine an appropriate turn rate for the drone.
                 turn_rate: float = np.clip(-angle / (np.pi / 2), -1.0, 1.0)
 
