@@ -64,32 +64,32 @@ class KeyboardDroneController(DroneController):
 
         # Allow the user to control the forward/backward movement of the drone.
         if pressed_keys[pygame.K_i]:
-            self.__drone.move_forward(0.5)
+            self.__drone.move_forward(self.__drone.calculate_forward_rate(m_per_s=1.0))
         elif pressed_keys[pygame.K_k]:
-            self.__drone.move_forward(-0.5)
+            self.__drone.move_forward(self.__drone.calculate_forward_rate(m_per_s=-1.0))
         else:
             self.__drone.move_forward(0.0)
 
         # Allow the user to control the left/right turning movement of the drone.
         if pressed_keys[pygame.K_j] and pressed_keys[pygame.K_LSHIFT]:
-            self.__drone.turn(self.__drone.calculate_turn_rate(rad_per_s=np.deg2rad(-45)))
+            self.__drone.turn(self.__drone.calculate_turn_rate(rad_per_s=np.deg2rad(-60)))
         elif pressed_keys[pygame.K_l] and pressed_keys[pygame.K_LSHIFT]:
-            self.__drone.turn(self.__drone.calculate_turn_rate(rad_per_s=np.deg2rad(45)))
+            self.__drone.turn(self.__drone.calculate_turn_rate(rad_per_s=np.deg2rad(60)))
         else:
             self.__drone.turn(0.0)
 
         # Allow the user to control the left/right strafing movement of the drone.
         if pressed_keys[pygame.K_j] and not pressed_keys[pygame.K_LSHIFT]:
-            self.__drone.move_right(-0.5)
+            self.__drone.move_right(self.__drone.calculate_right_rate(m_per_s=-1.0))
         elif pressed_keys[pygame.K_l] and not pressed_keys[pygame.K_LSHIFT]:
-            self.__drone.move_right(0.5)
+            self.__drone.move_right(self.__drone.calculate_right_rate(m_per_s=1.0))
         else:
             self.__drone.move_right(0.0)
 
         # Allow the user to control the upward/downward movement of the drone.
         if pressed_keys[pygame.K_u] and not pressed_keys[pygame.K_LSHIFT]:
-            self.__drone.move_up(0.5)
+            self.__drone.move_up(self.__drone.calculate_up_rate(m_per_s=1.0))
         elif pressed_keys[pygame.K_o] and not pressed_keys[pygame.K_LSHIFT]:
-            self.__drone.move_up(-0.5)
+            self.__drone.move_up(self.__drone.calculate_up_rate(m_per_s=-1.0))
         else:
             self.__drone.move_up(0.0)
