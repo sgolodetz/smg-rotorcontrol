@@ -99,8 +99,8 @@ class RTSStyleDroneController(DroneController):
 
             # Else if the user presses the 'b' key and a goal position has been determined:
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_b and self.__goal_pos is not None:
-                # Set a beacon at the goal position, with a maximum range of 2m (only relevant for simulated drones).
-                self.__drone.set_beacon("Foo", Beacon(self.__goal_pos, 2.0))
+                # Set a localised beacon at the goal position, with a maximum range of 2m.
+                self.__drone.set_localised_beacon("Foo", Beacon(self.__goal_pos, 2.0))
 
             # Else if the user presses a key, or clicks or releases a mouse button:
             elif event.type == pygame.KEYDOWN \
@@ -174,9 +174,9 @@ class RTSStyleDroneController(DroneController):
         glBlendColor(0.25, 0.25, 0.25, 0.25)
         glBlendFunc(GL_CONSTANT_COLOR, GL_ONE_MINUS_CONSTANT_COLOR)
 
-        # Render any beacons that we know about.
+        # Render any localised beacons.
         glColor3f(1, 1, 0)
-        for _, beacon in self.__drone.get_beacons().items():
+        for _, beacon in self.__drone.get_localised_beacons().items():
             OpenGLUtil.render_sphere(beacon.position, beacon.max_range, slices=30, stacks=30)
 
         # Disable blending again.
