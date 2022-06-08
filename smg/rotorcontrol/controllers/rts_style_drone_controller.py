@@ -15,6 +15,7 @@ from smg.pyoctomap import OctomapPicker
 from smg.rigging.cameras import Camera
 from smg.rigging.helpers import CameraPoseConverter
 from smg.rotory.drones import Drone
+from smg.rotory.util import Beacon
 
 from .drone_controller import DroneController
 from .landing_drone_controller import LandingDroneController
@@ -96,7 +97,12 @@ class RTSStyleDroneController(DroneController):
             if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
                 self.__movement_allowed = not self.__movement_allowed
 
-            # If the user presses any other key, or clicks or releases a mouse button:
+            # Else if the user presses the 'b' key and a goal position has been determined:
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_b and self.__goal_pos is not None:
+                # Set a beacon at the goal position, with a maximum range of 2m (only relevant for simulated drones).
+                self.__drone.set_beacon("Foo", Beacon(self.__goal_pos, 2.0))
+
+            # Else if the user presses a key, or clicks or releases a mouse button:
             elif event.type == pygame.KEYDOWN \
                     or event.type == pygame.MOUSEBUTTONDOWN \
                     or event.type == pygame.MOUSEBUTTONUP:
@@ -116,7 +122,7 @@ class RTSStyleDroneController(DroneController):
                     # Try to make and set a new inner controller.
                     self.__try_set_new_inner_controller(event, drone_pos)
 
-            # If the user scrolls the mouse wheel, change the desired offset of the goal position above the floor.
+            # Else if the user scrolls the mouse wheel, change the desired offset of the goal position above the floor.
             elif event.type == pygame.MOUSEWHEEL:
                 self.__height_offset = np.clip(self.__height_offset + event.y * 0.2, 0.3, 3.0)
 
@@ -159,6 +165,25 @@ class RTSStyleDroneController(DroneController):
                 join_pos: np.ndarray = 0.2 * self.__pre_goal_pos + 0.8 * self.__orienting_pos
                 OpenGLUtil.render_cylinder(self.__pre_goal_pos, join_pos, 0.05, 0.05, slices=10)
                 OpenGLUtil.render_cylinder(join_pos, self.__orienting_pos, 0.15, 0.0, slices=10)
+
+        # Disable writing to the depth buffer. (This is to avoid the drone being blocked by the beacons.)
+        glDepthMask(False)
+
+        # Enable blending.
+        glEnable(GL_BLEND)
+        glBlendColor(0.25, 0.25, 0.25, 0.25)
+        glBlendFunc(GL_CONSTANT_COLOR, GL_ONE_MINUS_CONSTANT_COLOR)
+
+        # Render any beacons that we know about.
+        glColor3f(1, 1, 0)
+        for _, beacon in self.__drone.get_beacons().items():
+            OpenGLUtil.render_sphere(beacon.position, beacon.max_range, slices=30, stacks=30)
+
+        # Disable blending again.
+        glDisable(GL_BLEND)
+
+        # Enable writing to the depth buffer again.
+        glDepthMask(True)
 
     def terminate(self) -> None:
         """Tell the controller to terminate."""
