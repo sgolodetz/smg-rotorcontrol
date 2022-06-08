@@ -46,7 +46,7 @@ class TraverseWaypointsDroneController(DroneController):
         self.__planning_toolkit: PlanningToolkit = planning_toolkit
         self.__should_terminate: threading.Event = threading.Event()
         self.__traverse_path_controller: TraversePathDroneController = TraversePathDroneController(drone=drone)
-        self.__waypoint_capture_range: float = 0.025
+        self.__waypoint_capture_range: float = 0.1
 
         # The shared variables, together with their lock.
         self.__current_pos: Optional[np.ndarray] = None
@@ -79,7 +79,8 @@ class TraverseWaypointsDroneController(DroneController):
         """
         with self.__lock:
             self.__waypoints += new_waypoints
-            self.__new_waypoint_count += len(new_waypoints)
+            self.__new_waypoint_count = len(self.__waypoints)
+            # self.__new_waypoint_count += len(new_waypoints)
 
     def get_current_pos(self) -> Optional[np.ndarray]:
         """Get the current position of the drone (if available yet), or None otherwise."""
@@ -185,7 +186,7 @@ class TraverseWaypointsDroneController(DroneController):
                 new_path = self.__planner.update_path(
                     self.__current_pos, self.__path, debug=self.__debug,
                     d=PlanningToolkit.l1_distance(ay=self.__ay), h=PlanningToolkit.l1_distance(ay=self.__ay),
-                    allow_shortcuts=True, pull_strings=True, use_clearance=True,
+                    allow_shortcuts=True, pull_strings=False, use_clearance=True,
                     waypoint_capture_range=self.__waypoint_capture_range
                 )
 
@@ -195,7 +196,7 @@ class TraverseWaypointsDroneController(DroneController):
                     new_path = self.__planner.update_path(
                         self.__current_pos, self.__path, debug=self.__debug,
                         d=PlanningToolkit.l1_distance(ay=self.__ay), h=PlanningToolkit.l1_distance(ay=self.__ay),
-                        allow_shortcuts=True, pull_strings=True, use_clearance=False,
+                        allow_shortcuts=True, pull_strings=False, use_clearance=False,
                         waypoint_capture_range=self.__waypoint_capture_range
                     )
 
@@ -366,6 +367,8 @@ class TraverseWaypointsDroneController(DroneController):
                     # Otherwise, simply replace the existing path.
                     else:
                         self.__path = new_path
+
+                    self.__path = self.__path.interpolate() if self.__path is not None else None
 
                     # Decrease the number of new waypoints for which planned is still required, and reset the flag
                     # indicating that planning is needed. If there are still waypoints outstanding, path planning

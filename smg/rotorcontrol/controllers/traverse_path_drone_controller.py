@@ -79,7 +79,7 @@ class TraversePathDroneController(DroneController):
 
                 # If we're far enough horizontally from the next waypoint to turn the drone before we get there:
                 horizontal_offset_length: float = np.linalg.norm(horizontal_offset)
-                if horizontal_offset_length >= 0.1:
+                if True:  # horizontal_offset_length >= 0.1:
                     # Determine the current orientation of the drone in the horizontal plane.
                     current_n: np.ndarray = vg.normalize(np.array([cam.n()[0], 0, cam.n()[2]]))
 
@@ -98,16 +98,16 @@ class TraversePathDroneController(DroneController):
                     turn_rate: float = self.__drone.calculate_turn_rate(rad_per_s=-angle)
 
                 # Otherwise, set both the angle by which the drone needs to turn and the turn rate to zero.
-                else:
-                    angle: float = 0.0
-                    turn_rate: float = 0.0
+                # else:
+                #     angle: float = 0.0
+                #     turn_rate: float = 0.0
 
                 # Set the drone's turn rate.
                 self.__drone.turn(turn_rate)
 
                 # Determine the linear rates at which the drone should in principle move in each of the three axes.
-                max_m_per_s: float = 1.0
-                m_per_s: float = max_m_per_s if offset_length >= 0.5 else max(max_m_per_s * offset_length / 0.5, 0.25)
+                max_m_per_s: float = 0.5
+                m_per_s: float = max_m_per_s   #if offset_length >= 0.5 else max(max_m_per_s * offset_length / 0.5, 0.25)
 
                 normalized_offset: np.ndarray = offset / offset_length
                 desired_forward_velocity: float = vg.scalar_projection(normalized_offset, cam.n()) * m_per_s
@@ -130,7 +130,7 @@ class TraversePathDroneController(DroneController):
 
                 # If the drone's current orientation is within a reasonable angle of its target orientation,
                 # or alternatively if the drone is not currently turning, set the calculated linear rates.
-                if np.fabs(angle) * 180 / np.pi <= 30.0 or turn_rate == 0.0:
+                if True:  # np.fabs(angle) * 180 / np.pi <= 30.0 or turn_rate == 0.0:
                     self.__drone.move_forward(forward_rate)
                     self.__drone.move_right(right_rate)
                     self.__drone.move_up(up_rate)
