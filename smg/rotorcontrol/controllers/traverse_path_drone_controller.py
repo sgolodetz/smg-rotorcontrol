@@ -11,6 +11,7 @@ from smg.navigation import Path
 from smg.rigging.cameras import SimpleCamera
 from smg.rigging.helpers import CameraPoseConverter
 from smg.rotory.drones import Drone
+from smg.utility import GeometryUtil
 
 from .drone_controller import DroneController
 
@@ -96,7 +97,7 @@ class TraversePathDroneController(DroneController):
                     sign: int = 1 if np.dot(cp, np.array([0, -1, 0])) >= 0 else -1
 
                     # Determine the angle by which the drone needs to turn to achieve the target orientation.
-                    angle: float = sign * np.arccos(np.clip(np.dot(current_n, target_n), -1.0, 1.0))
+                    angle: float = sign * GeometryUtil.angle_between(current_n, target_n)
 
                     # Determine an appropriate turn rate for the drone.
                     turn_rate: float = np.clip(-angle / (np.pi / 2), -1.0, 1.0)
