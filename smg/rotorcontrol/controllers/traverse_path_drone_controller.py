@@ -107,11 +107,14 @@ class TraversePathDroneController(DroneController):
                     angle: float = 0.0
                     turn_rate: float = 0.0
 
+                print(turn_rate)
+                # turn_rate = 0.0
+
                 # Set the drone's turn rate.
                 self.__drone.turn(turn_rate)
 
                 # Determine the linear rates at which the drone should in principle move in each of the three axes.
-                max_m_per_s: float = 0.1
+                max_m_per_s: float = 0.2
                 m_per_s: float = max_m_per_s if offset_length >= 0.5 else max(max_m_per_s * offset_length / 0.5, 0.05)
 
                 normalized_offset: np.ndarray = offset / offset_length
@@ -132,6 +135,9 @@ class TraversePathDroneController(DroneController):
                 forward_rate: float = self.__drone.calculate_forward_rate(min_fraction * desired_forward_velocity)
                 right_rate: float = self.__drone.calculate_right_rate(min_fraction * desired_right_velocity)
                 up_rate: float = self.__drone.calculate_up_rate(min_fraction * desired_up_velocity)
+
+                print(forward_rate, right_rate, up_rate)
+                # forward_rate = right_rate = up_rate = 0.0
 
                 # If the drone's current orientation is within a reasonable angle of its target orientation,
                 # or alternatively if the drone is not currently turning, set the calculated linear rates.
