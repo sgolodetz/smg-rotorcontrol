@@ -43,6 +43,7 @@ class TraverseWaypointsDroneController(DroneController):
         self.__ay: float = 10
         self.__debug: bool = debug
         self.__drone: Drone = drone
+        self.__path_tracking_range: float = 0.05
         self.__planning_toolkit: PlanningToolkit = planning_toolkit
         self.__should_terminate: threading.Event = threading.Event()
         self.__traverse_path_controller: TraversePathDroneController = TraversePathDroneController(drone=drone)
@@ -192,6 +193,7 @@ class TraverseWaypointsDroneController(DroneController):
                     self.__current_pos, self.__path, debug=self.__debug,
                     d=PlanningToolkit.l1_distance(ay=self.__ay), h=PlanningToolkit.l1_distance(ay=self.__ay),
                     allow_shortcuts=True, pull_strings=True, use_clearance=True,
+                    path_tracking_range=self.__path_tracking_range,
                     waypoint_capture_range=self.__waypoint_capture_range
                 )
 
@@ -202,6 +204,7 @@ class TraverseWaypointsDroneController(DroneController):
                         self.__current_pos, self.__path, debug=self.__debug,
                         d=PlanningToolkit.l1_distance(ay=self.__ay), h=PlanningToolkit.l1_distance(ay=self.__ay),
                         allow_shortcuts=True, pull_strings=True, use_clearance=False,
+                        path_tracking_range=self.__path_tracking_range,
                         waypoint_capture_range=self.__waypoint_capture_range
                     )
 
