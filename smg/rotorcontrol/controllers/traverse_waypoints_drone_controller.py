@@ -43,6 +43,7 @@ class TraverseWaypointsDroneController(DroneController):
         self.__ay: float = 10
         self.__debug: bool = debug
         self.__drone: Drone = drone
+        self.__path_tracking_range: float = 0.05
         self.__planning_toolkit: PlanningToolkit = planning_toolkit
         self.__should_terminate: threading.Event = threading.Event()
         self.__traverse_path_controller: TraversePathDroneController = TraversePathDroneController(drone=drone)
@@ -137,7 +138,7 @@ class TraverseWaypointsDroneController(DroneController):
             scale-correct. We explicitly check (i). We can't check (ii), so client code is responsible for
             correct use.
         .. note::
-            This controller also requires the drone's rates to be calibrated. We explicitly check for this.
+            This controller requires the drone's rates to be calibrated. We explicitly check for this.
 
         :param altitude:            The most recent altitude (in m) for the drone, as measured by any height sensor
                                     it is carrying (optional).
@@ -193,6 +194,7 @@ class TraverseWaypointsDroneController(DroneController):
                     self.__current_pos, self.__path, debug=self.__debug,
                     d=PlanningToolkit.l1_distance(ay=self.__ay), h=PlanningToolkit.l1_distance(ay=self.__ay),
                     allow_shortcuts=True, pull_strings=True, use_clearance=True,
+                    path_tracking_range=self.__path_tracking_range,
                     waypoint_capture_range=self.__waypoint_capture_range
                 )
 
@@ -203,6 +205,7 @@ class TraverseWaypointsDroneController(DroneController):
                         self.__current_pos, self.__path, debug=self.__debug,
                         d=PlanningToolkit.l1_distance(ay=self.__ay), h=PlanningToolkit.l1_distance(ay=self.__ay),
                         allow_shortcuts=True, pull_strings=True, use_clearance=False,
+                        path_tracking_range=self.__path_tracking_range,
                         waypoint_capture_range=self.__waypoint_capture_range
                     )
 
