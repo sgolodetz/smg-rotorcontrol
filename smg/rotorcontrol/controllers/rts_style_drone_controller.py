@@ -15,7 +15,7 @@ from smg.pyoctomap import OctomapPicker
 from smg.rigging.cameras import Camera
 from smg.rigging.helpers import CameraPoseConverter
 from smg.rotory.drones import Drone
-from smg.rotory.util import Beacon
+from smg.rotory.util import Beacon, BeaconLocaliser
 
 from .drone_controller import DroneController
 from .landing_drone_controller import LandingDroneController
@@ -46,6 +46,7 @@ class RTSStyleDroneController(DroneController):
         if planning_toolkit is None:
             raise RuntimeError("Error: An RTS-style drone controller requires a planning toolkit for the scene")
 
+        self.__beacon_localiser: BeaconLocaliser = BeaconLocaliser()
         self.__debug: bool = debug
         self.__drone: Drone = drone
         self.__goal_orientation_valid: bool = False
@@ -91,6 +92,9 @@ class RTSStyleDroneController(DroneController):
         # Update the goal that the user wants the drone to achieve.
         self.__update_goal()
 
+        # TODO
+        print(f"Beacon Ranges: {self.__drone.get_beacon_ranges(known_beacons=self.__beacon_localiser.get_beacons())}")
+
         # Process any PyGame events that have happened since the last iteration.
         for event in events:
             # If the user presses the 'space' key, toggle whether the drone is allowed to move.
@@ -99,8 +103,8 @@ class RTSStyleDroneController(DroneController):
 
             # Else if the user presses the 'b' key and a goal position has been determined:
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_b and self.__goal_pos is not None:
-                # Set a localised beacon at the goal position, with a maximum range of 2m.
-                self.__drone.set_localised_beacon("Foo", Beacon(self.__goal_pos, 2.0))
+                # Set a test beacon at the goal position, with a maximum range of 2m.
+                self.__beacon_localiser.set_test_beacon("Foo", Beacon(self.__goal_pos, 2.0))
 
             # Else if the user presses a key, or clicks or releases a mouse button:
             elif event.type == pygame.KEYDOWN \
@@ -174,9 +178,9 @@ class RTSStyleDroneController(DroneController):
         glBlendColor(0.25, 0.25, 0.25, 0.25)
         glBlendFunc(GL_CONSTANT_COLOR, GL_ONE_MINUS_CONSTANT_COLOR)
 
-        # Render any localised beacons.
+        # Render any known beacons.
         glColor3f(1, 1, 0)
-        for _, beacon in self.__drone.get_localised_beacons().items():
+        for _, beacon in self.__beacon_localiser.get_beacons().items():
             OpenGLUtil.render_sphere(beacon.position, beacon.max_range, slices=30, stacks=30)
 
         # Disable blending again.
