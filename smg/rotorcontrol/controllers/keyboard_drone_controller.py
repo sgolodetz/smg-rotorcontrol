@@ -33,6 +33,9 @@ class KeyboardDroneController(DroneController):
         """
         Run an iteration of the controller.
 
+        .. note::
+            This controller requires the drone's rates to be calibrated. We explicitly check for this.
+
         :param altitude:            The most recent altitude (in m) for the drone, as measured by any height sensor
                                     it is carrying (optional).
         :param events:              An optional list of PyGame events that have happened since the last iteration.
@@ -44,6 +47,10 @@ class KeyboardDroneController(DroneController):
                                     is running (optional). Note that if the tracker is monocular, the transformation is
                                     unlikely to be scale-correct.
         """
+        # If the drone's rates have not been calibrated, raise an exception and early out.
+        if not self.__drone.has_calibrated_rates():
+            raise RuntimeError("Error: Drones must have calibrated rates when using keyboard control")
+
         # If no PyGame events were passed in, use an empty list of events as the default.
         if events is None:
             events = []
@@ -64,32 +71,32 @@ class KeyboardDroneController(DroneController):
 
         # Allow the user to control the forward/backward movement of the drone.
         if pressed_keys[pygame.K_i]:
-            self.__drone.move_forward(0.5)
+            self.__drone.move_forward(self.__drone.calculate_forward_rate(m_per_s=1.0))
         elif pressed_keys[pygame.K_k]:
-            self.__drone.move_forward(-0.5)
+            self.__drone.move_forward(self.__drone.calculate_forward_rate(m_per_s=-1.0))
         else:
             self.__drone.move_forward(0.0)
 
         # Allow the user to control the left/right turning movement of the drone.
         if pressed_keys[pygame.K_j] and pressed_keys[pygame.K_LSHIFT]:
-            self.__drone.turn(-0.5)
+            self.__drone.turn(self.__drone.calculate_turn_rate(rad_per_s=np.deg2rad(-60)))
         elif pressed_keys[pygame.K_l] and pressed_keys[pygame.K_LSHIFT]:
-            self.__drone.turn(0.5)
+            self.__drone.turn(self.__drone.calculate_turn_rate(rad_per_s=np.deg2rad(60)))
         else:
             self.__drone.turn(0.0)
 
         # Allow the user to control the left/right strafing movement of the drone.
         if pressed_keys[pygame.K_j] and not pressed_keys[pygame.K_LSHIFT]:
-            self.__drone.move_right(-0.5)
+            self.__drone.move_right(self.__drone.calculate_right_rate(m_per_s=-1.0))
         elif pressed_keys[pygame.K_l] and not pressed_keys[pygame.K_LSHIFT]:
-            self.__drone.move_right(0.5)
+            self.__drone.move_right(self.__drone.calculate_right_rate(m_per_s=1.0))
         else:
             self.__drone.move_right(0.0)
 
         # Allow the user to control the upward/downward movement of the drone.
         if pressed_keys[pygame.K_u] and not pressed_keys[pygame.K_LSHIFT]:
-            self.__drone.move_up(0.5)
+            self.__drone.move_up(self.__drone.calculate_up_rate(m_per_s=1.0))
         elif pressed_keys[pygame.K_o] and not pressed_keys[pygame.K_LSHIFT]:
-            self.__drone.move_up(-0.5)
+            self.__drone.move_up(self.__drone.calculate_up_rate(m_per_s=-1.0))
         else:
             self.__drone.move_up(0.0)
