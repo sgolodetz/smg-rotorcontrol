@@ -43,6 +43,7 @@ class TraverseWaypointsDroneController(DroneController):
         self.__ay: float = 10
         self.__debug: bool = debug
         self.__drone: Drone = drone
+        self.__path_tracking_range: float = 0.05
         self.__planning_toolkit: PlanningToolkit = planning_toolkit
         self.__should_terminate: threading.Event = threading.Event()
         self.__traverse_path_controller: TraversePathDroneController = TraversePathDroneController(drone=drone)
@@ -136,6 +137,8 @@ class TraverseWaypointsDroneController(DroneController):
             This controller (i) requires the tracker poses to be passed in, and (ii) requires that they be
             scale-correct. We explicitly check (i). We can't check (ii), so client code is responsible for
             correct use.
+        .. note::
+            This controller requires the drone's rates to be calibrated. We explicitly check for this.
 
         :param altitude:            The most recent altitude (in m) for the drone, as measured by any height sensor
                                     it is carrying (optional).
@@ -155,6 +158,10 @@ class TraverseWaypointsDroneController(DroneController):
         # If no tracker pose has been passed in, raise an exception and early out.
         if tracker_c_t_i is None:
             raise RuntimeError("Error: Tracker poses must be provided when using 'traverse waypoints' control")
+
+        # If the drone's rates have not been calibrated, raise an exception and early out.
+        if not self.__drone.has_calibrated_rates():
+            raise RuntimeError("Error: Drones must have calibrated rates when using 'traverse waypoints' control")
 
         with self.__lock:
             # --- Step 1: Update the drone's current position, and ensure its estimated start position is set ---#
@@ -186,6 +193,7 @@ class TraverseWaypointsDroneController(DroneController):
                     self.__current_pos, self.__path, debug=self.__debug,
                     d=PlanningToolkit.l1_distance(ay=self.__ay), h=PlanningToolkit.l1_distance(ay=self.__ay),
                     allow_shortcuts=True, pull_strings=True, use_clearance=True,
+                    path_tracking_range=self.__path_tracking_range,
                     waypoint_capture_range=self.__waypoint_capture_range
                 )
 
@@ -196,6 +204,7 @@ class TraverseWaypointsDroneController(DroneController):
                         self.__current_pos, self.__path, debug=self.__debug,
                         d=PlanningToolkit.l1_distance(ay=self.__ay), h=PlanningToolkit.l1_distance(ay=self.__ay),
                         allow_shortcuts=True, pull_strings=True, use_clearance=False,
+                        path_tracking_range=self.__path_tracking_range,
                         waypoint_capture_range=self.__waypoint_capture_range
                     )
 

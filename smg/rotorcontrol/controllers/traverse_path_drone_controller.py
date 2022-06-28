@@ -95,7 +95,7 @@ class TraversePathDroneController(DroneController):
                     angle: float = sign * GeometryUtil.angle_between(current_n, target_n)
 
                     # Determine an appropriate turn rate for the drone.
-                    turn_rate: float = np.clip(-angle / (np.pi / 2), -1.0, 1.0)
+                    turn_rate: float = self.__drone.calculate_turn_rate(rad_per_s=-angle)
 
                 # Otherwise, set both the angle by which the drone needs to turn and the turn rate to zero.
                 else:
@@ -106,11 +106,27 @@ class TraversePathDroneController(DroneController):
                 self.__drone.turn(turn_rate)
 
                 # Determine the linear rates at which the drone should in principle move in each of the three axes.
-                speed: float = 0.5
+                max_m_per_s: float = 1.0
+                m_per_s: float = max_m_per_s if offset_length >= 0.5 else max(max_m_per_s * offset_length / 0.5, 0.25)
+
                 normalized_offset: np.ndarray = offset / offset_length
-                forward_rate: float = vg.scalar_projection(normalized_offset, cam.n()) * speed
-                right_rate: float = vg.scalar_projection(normalized_offset, -cam.u()) * speed
-                up_rate: float = vg.scalar_projection(normalized_offset, cam.v()) * speed
+                desired_forward_velocity: float = vg.scalar_projection(normalized_offset, cam.n()) * m_per_s
+                desired_right_velocity: float = vg.scalar_projection(normalized_offset, -cam.u()) * m_per_s
+                desired_up_velocity: float = vg.scalar_projection(normalized_offset, cam.v()) * m_per_s
+
+                forward_velocity: float = self.__drone.clip_forward_velocity(desired_forward_velocity)
+                right_velocity: float = self.__drone.clip_right_velocity(desired_right_velocity)
+                up_velocity: float = self.__drone.clip_up_velocity(desired_up_velocity)
+
+                min_fraction: float = min(
+                    forward_velocity / desired_forward_velocity if np.fabs(desired_forward_velocity) > 1e-4 else 1.0,
+                    right_velocity / desired_right_velocity if np.fabs(desired_right_velocity) > 1e-4 else 1.0,
+                    up_velocity / desired_up_velocity if np.fabs(desired_up_velocity) > 1e-4 else 1.0
+                )
+
+                forward_rate: float = self.__drone.calculate_forward_rate(min_fraction * desired_forward_velocity)
+                right_rate: float = self.__drone.calculate_right_rate(min_fraction * desired_right_velocity)
+                up_rate: float = self.__drone.calculate_up_rate(min_fraction * desired_up_velocity)
 
                 # If the drone's current orientation is within a reasonable angle of its target orientation,
                 # or alternatively if the drone is not currently turning, set the calculated linear rates.
