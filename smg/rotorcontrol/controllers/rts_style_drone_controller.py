@@ -96,7 +96,7 @@ class RTSStyleDroneController(DroneController):
         beacon_ranges: Dict[str, float] = self.__drone.get_beacon_ranges(
             test_beacons=self.__beacon_localiser.get_test_beacons()
         )
-        print(f"Beacon Ranges: {beacon_ranges}")
+        # print(f"Beacon Ranges: {beacon_ranges}")
         if tracker_c_t_i is not None:
             drone_pos: np.ndarray = DroneController._extract_current_pos(tracker_c_t_i)
             self.__beacon_localiser.add_beacon_measurements(drone_pos, beacon_ranges)
@@ -204,6 +204,8 @@ class RTSStyleDroneController(DroneController):
         """Tell the controller to terminate."""
         for inner_controller in self.__inner_controllers:
             inner_controller.terminate()
+
+        self.__beacon_localiser.terminate()
 
     # PRIVATE METHODS
 
