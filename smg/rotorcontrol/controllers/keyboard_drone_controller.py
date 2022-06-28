@@ -33,6 +33,9 @@ class KeyboardDroneController(DroneController):
         """
         Run an iteration of the controller.
 
+        .. note::
+            This controller requires the drone's rates to be calibrated. We explicitly check for this.
+
         :param altitude:            The most recent altitude (in m) for the drone, as measured by any height sensor
                                     it is carrying (optional).
         :param events:              An optional list of PyGame events that have happened since the last iteration.
@@ -44,6 +47,10 @@ class KeyboardDroneController(DroneController):
                                     is running (optional). Note that if the tracker is monocular, the transformation is
                                     unlikely to be scale-correct.
         """
+        # If the drone's rates have not been calibrated, raise an exception and early out.
+        if not self.__drone.has_calibrated_rates():
+            raise RuntimeError("Error: Drones must have calibrated rates when using keyboard control")
+
         # If no PyGame events were passed in, use an empty list of events as the default.
         if events is None:
             events = []

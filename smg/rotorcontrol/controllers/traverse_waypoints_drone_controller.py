@@ -138,7 +138,7 @@ class TraverseWaypointsDroneController(DroneController):
             scale-correct. We explicitly check (i). We can't check (ii), so client code is responsible for
             correct use.
         .. note::
-            This controller also requires the drone's rates to be calibrated. We explicitly check for this.
+            This controller requires the drone's rates to be calibrated. We explicitly check for this.
 
         :param altitude:            The most recent altitude (in m) for the drone, as measured by any height sensor
                                     it is carrying (optional).
