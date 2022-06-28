@@ -14,8 +14,8 @@ from smg.opengl import OpenGLUtil
 from smg.pyoctomap import OctomapPicker
 from smg.rigging.cameras import Camera
 from smg.rigging.helpers import CameraPoseConverter
+from smg.rotory.beacons import Beacon, BeaconLocaliser
 from smg.rotory.drones import Drone
-from smg.rotory.util import Beacon, BeaconLocaliser
 
 from .drone_controller import DroneController
 from .landing_drone_controller import LandingDroneController
