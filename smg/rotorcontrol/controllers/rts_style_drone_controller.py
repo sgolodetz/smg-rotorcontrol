@@ -190,9 +190,23 @@ class RTSStyleDroneController(DroneController):
         glBlendFunc(GL_CONSTANT_COLOR, GL_ONE_MINUS_CONSTANT_COLOR)
 
         # Render any known beacons.
+        beacons: Dict[str, Beacon] = self.__beacon_localiser.get_beacons()
+        measurements: Dict[str, List[Tuple[np.ndarray, float]]] = self.__beacon_localiser.get_beacon_measurements()
+
         glColor3f(1, 1, 0)
-        for _, beacon in self.__beacon_localiser.get_beacons().items():
+        for _, beacon in beacons.items():
             OpenGLUtil.render_sphere(beacon.position, beacon.max_range, slices=30, stacks=30)
+
+        glColor3f(1, 0, 0)
+        glBegin(GL_LINES)
+        for beacon_name, measurements_for_beacon in measurements.items():
+            if beacons.get(f"L_{beacon_name}") is None:
+                continue
+
+            for receiver_pos, _ in measurements_for_beacon:
+                glVertex3f(*receiver_pos)
+                glVertex3f(*beacons[f"L_{beacon_name}"].position)
+        glEnd()
 
         # Disable blending again.
         glDisable(GL_BLEND)
