@@ -93,12 +93,12 @@ class RTSStyleDroneController(DroneController):
         self.__update_goal()
 
         # TODO
-        beacon_ranges: Dict[str, float] = self.__drone.get_beacon_ranges(
-            test_beacons=self.__beacon_localiser.get_test_beacons()
-        )
-        # print(f"Beacon Ranges: {beacon_ranges}")
         if tracker_c_t_i is not None:
             drone_pos: np.ndarray = DroneController._extract_current_pos(tracker_c_t_i)
+            beacon_ranges: Dict[str, float] = self.__drone.get_beacon_ranges(
+                drone_pos, test_beacons=self.__beacon_localiser.get_test_beacons()
+            )
+            # print(f"Beacon Ranges: {beacon_ranges}")
             self.__beacon_localiser.add_beacon_measurements(drone_pos, beacon_ranges)
 
         # Process any PyGame events that have happened since the last iteration.
