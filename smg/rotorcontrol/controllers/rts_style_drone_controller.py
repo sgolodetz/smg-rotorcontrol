@@ -96,7 +96,7 @@ class RTSStyleDroneController(DroneController):
         if tracker_c_t_i is not None:
             drone_pos: np.ndarray = DroneController._extract_current_pos(tracker_c_t_i)
             beacon_ranges: Dict[str, float] = self.__drone.get_beacon_ranges(
-                drone_pos, test_beacons=self.__beacon_localiser.get_test_beacons()
+                drone_pos, fake_beacons=self.__beacon_localiser.get_fake_beacons()
             )
             # print(f"Beacon Ranges: {beacon_ranges}")
             self.__beacon_localiser.add_beacon_measurements(drone_pos, beacon_ranges)
@@ -112,10 +112,10 @@ class RTSStyleDroneController(DroneController):
                 # TODO
                 if pygame.key.get_mods() & pygame.KMOD_SHIFT:
                     # TODO
-                    self.__beacon_localiser.set_test_beacon("Foo", None)
+                    self.__beacon_localiser.set_fake_beacon("Foo", None)
                 else:
                     # Set a test beacon at the goal position, with a maximum range of 2m.
-                    self.__beacon_localiser.set_test_beacon("Foo", Beacon(self.__goal_pos, 2.0))
+                    self.__beacon_localiser.set_fake_beacon("Foo", Beacon(self.__goal_pos, 2.0))
 
             # Else if the user presses a key, or clicks or releases a mouse button:
             elif event.type == pygame.KEYDOWN \
