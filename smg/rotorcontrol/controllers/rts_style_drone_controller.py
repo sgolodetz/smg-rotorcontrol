@@ -181,38 +181,8 @@ class RTSStyleDroneController(DroneController):
                 OpenGLUtil.render_cylinder(self.__pre_goal_pos, join_pos, 0.05, 0.05, slices=10)
                 OpenGLUtil.render_cylinder(join_pos, self.__orienting_pos, 0.15, 0.0, slices=10)
 
-        # Disable writing to the depth buffer. (This is to avoid the drone being blocked by the beacons.)
-        glDepthMask(False)
-
-        # Enable blending.
-        glEnable(GL_BLEND)
-        glBlendColor(0.25, 0.25, 0.25, 0.25)
-        glBlendFunc(GL_CONSTANT_COLOR, GL_ONE_MINUS_CONSTANT_COLOR)
-
         # Render any known beacons.
-        beacons: Dict[str, Beacon] = self.__beacon_localiser.get_beacons()
-        measurements: Dict[str, List[Tuple[np.ndarray, float]]] = self.__beacon_localiser.get_beacon_measurements()
-
-        glColor3f(1, 1, 0)
-        for _, beacon in beacons.items():
-            OpenGLUtil.render_sphere(beacon.position, beacon.max_range, slices=30, stacks=30)
-
-        glColor3f(1, 0, 0)
-        glBegin(GL_LINES)
-        for beacon_name, measurements_for_beacon in measurements.items():
-            if beacons.get(f"L_{beacon_name}") is None:
-                continue
-
-            for receiver_pos, _ in measurements_for_beacon:
-                glVertex3f(*receiver_pos)
-                glVertex3f(*beacons[f"L_{beacon_name}"].position)
-        glEnd()
-
-        # Disable blending again.
-        glDisable(GL_BLEND)
-
-        # Enable writing to the depth buffer again.
-        glDepthMask(True)
+        self.__render_beacons()
 
     def terminate(self) -> None:
         """Tell the controller to terminate."""
@@ -275,6 +245,44 @@ class RTSStyleDroneController(DroneController):
         :return:    The last inner controller (if any), or None otherwise.
         """
         return self.__inner_controllers[-1] if len(self.__inner_controllers) > 0 else None
+
+    def __render_beacons(self) -> None:
+        """Render any known beacons."""
+        # Disable writing to the depth buffer. (This is to avoid the drone being blocked by the beacons.)
+        glDepthMask(False)
+
+        # Enable blending.
+        glEnable(GL_BLEND)
+        glBlendColor(0.25, 0.25, 0.25, 0.25)
+        glBlendFunc(GL_CONSTANT_COLOR, GL_ONE_MINUS_CONSTANT_COLOR)
+
+        # Get the beacons and beacon measurements from the localiser.
+        beacons: Dict[str, Beacon] = self.__beacon_localiser.get_beacons()
+        beacon_measurements: Dict[str, List[Tuple[np.ndarray, float]]] = \
+            self.__beacon_localiser.get_beacon_measurements()
+
+        # Render the beacons.
+        glColor3f(1, 1, 0)
+        for _, beacon in beacons.items():
+            OpenGLUtil.render_sphere(beacon.position, beacon.max_range, slices=30, stacks=30)
+
+        # Render the beacon measurements.
+        glColor3f(1, 0, 0)
+        glBegin(GL_LINES)
+        for beacon_name, measurements_for_beacon in beacon_measurements.items():
+            if beacons.get(f"L_{beacon_name}") is None:
+                continue
+
+            for receiver_pos, _ in measurements_for_beacon:
+                glVertex3f(*receiver_pos)
+                glVertex3f(*beacons[f"L_{beacon_name}"].position)
+        glEnd()
+
+        # Disable blending again.
+        glDisable(GL_BLEND)
+
+        # Enable writing to the depth buffer again.
+        glDepthMask(True)
 
     def __render_traversability_sphere(self, pos: np.ndarray, *, radius: float) -> None:
         """
