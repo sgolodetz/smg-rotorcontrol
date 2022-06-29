@@ -28,12 +28,14 @@ class TraverseWaypointsDroneController(DroneController):
 
     # CONSTRUCTOR
 
-    def __init__(self, *, debug: bool = False, drone: Drone, planning_toolkit: PlanningToolkit):
+    def __init__(self, *, debug: bool = False, drone: Drone, interpolate_paths: bool = True,
+                 planning_toolkit: PlanningToolkit):
         """
         Construct a flight controller for a drone that tries to traverse a specified set of waypoints.
 
         :param debug:               Whether to enable debugging.
         :param drone:               The drone.
+        :param interpolate_paths:   Whether or not to interpolate the paths that are planned.
         :param planning_toolkit:    The planning toolkit (used for path planning).
         """
         super().__init__()
@@ -43,11 +45,12 @@ class TraverseWaypointsDroneController(DroneController):
         self.__ay: float = 10
         self.__debug: bool = debug
         self.__drone: Drone = drone
-        self.__path_tracking_range: float = 0.05
+        self.__interpolate_paths: bool = interpolate_paths
+        self.__path_tracking_range: float = 0.1 if interpolate_paths else 0.05
         self.__planning_toolkit: PlanningToolkit = planning_toolkit
         self.__should_terminate: threading.Event = threading.Event()
         self.__traverse_path_controller: TraversePathDroneController = TraversePathDroneController(drone=drone)
-        self.__waypoint_capture_range: float = 0.1
+        self.__waypoint_capture_range: float = 0.1 if interpolate_paths else 0.025
 
         # The shared variables, together with their lock.
         self.__current_pos: Optional[np.ndarray] = None
@@ -377,7 +380,9 @@ class TraverseWaypointsDroneController(DroneController):
                     else:
                         self.__path = new_path
 
-                    self.__path = self.__path.interpolate() if self.__path is not None else None
+                    # If interpolation is enabled, interpolate the path.
+                    if self.__interpolate_paths:
+                        self.__path = self.__path.interpolate() if self.__path is not None else None
 
                     # Decrease the number of new waypoints for which planned is still required, and reset the flag
                     # indicating that planning is needed. If there are still waypoints outstanding, path planning
