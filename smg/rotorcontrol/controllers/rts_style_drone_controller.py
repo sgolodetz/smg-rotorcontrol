@@ -279,7 +279,7 @@ class RTSStyleDroneController(DroneController):
             for receiver_pos, beacon_range in measurements_for_beacon:
                 beacon_pos: np.ndarray = beacons[f"L_{beacon_name}"].position
                 measurement_err: float = abs(np.linalg.norm(receiver_pos - beacon_pos) - beacon_range)
-                t: float = np.clip(measurement_err / 0.01, 0.0, 1.0)
+                t: float = np.clip(measurement_err / 0.1, 0.0, 1.0)
                 glColor3f(t, 1 - t, 0)
 
                 glVertex3f(*receiver_pos)
