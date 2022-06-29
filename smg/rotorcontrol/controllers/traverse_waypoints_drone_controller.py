@@ -43,7 +43,7 @@ class TraverseWaypointsDroneController(DroneController):
         self.__ay: float = 10
         self.__debug: bool = debug
         self.__drone: Drone = drone
-        self.__path_tracking_range: float = 0.05
+        self.__path_tracking_range: float = 0.1
         self.__planning_toolkit: PlanningToolkit = planning_toolkit
         self.__should_terminate: threading.Event = threading.Event()
         self.__traverse_path_controller: TraversePathDroneController = TraversePathDroneController(drone=drone)
