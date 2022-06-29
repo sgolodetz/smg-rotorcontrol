@@ -115,7 +115,7 @@ class RTSStyleDroneController(DroneController):
                     self.__beacon_localiser.set_fake_beacon("Foo", None)
                 else:
                     # Set a test beacon at the goal position, with a maximum range of 2m.
-                    self.__beacon_localiser.set_fake_beacon("Foo", Beacon(self.__goal_pos, 2.0))
+                    self.__beacon_localiser.set_fake_beacon("Foo", Beacon(self.__goal_pos, 2.0, Beacon.BT_FAKE))
 
             # Else if the user presses a key, or clicks or releases a mouse button:
             elif event.type == pygame.KEYDOWN \
@@ -262,20 +262,28 @@ class RTSStyleDroneController(DroneController):
             self.__beacon_localiser.get_beacon_measurements()
 
         # Render the beacons.
-        glColor3f(1, 1, 0)
         for _, beacon in beacons.items():
+            if beacon.beacon_type == Beacon.BT_FAKE:
+                glColor3f(1, 1, 0)
+            elif beacon.beacon_type == Beacon.BT_LOCALISED:
+                glColor3f(0, 1, 1)
+
             OpenGLUtil.render_sphere(beacon.position, beacon.max_range, slices=30, stacks=30)
 
         # Render the beacon measurements.
-        glColor3f(1, 0, 0)
         glBegin(GL_LINES)
         for beacon_name, measurements_for_beacon in beacon_measurements.items():
             if beacons.get(f"L_{beacon_name}") is None:
                 continue
 
-            for receiver_pos, _ in measurements_for_beacon:
+            for receiver_pos, beacon_range in measurements_for_beacon:
+                beacon_pos: np.ndarray = beacons[f"L_{beacon_name}"].position
+                measurement_err: float = abs(np.linalg.norm(receiver_pos - beacon_pos) - beacon_range)
+                t: float = np.clip(measurement_err / 0.01, 0.0, 1.0)
+                glColor3f(t, 1 - t, 0)
+
                 glVertex3f(*receiver_pos)
-                glVertex3f(*beacons[f"L_{beacon_name}"].position)
+                glVertex3f(*beacon_pos)
         glEnd()
 
         # Disable blending again.
