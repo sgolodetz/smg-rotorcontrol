@@ -28,14 +28,14 @@ class TraverseWaypointsDroneController(DroneController):
 
     # CONSTRUCTOR
 
-    def __init__(self, *, debug: bool = False, drone: Drone, interpolate_paths: bool = False,
+    def __init__(self, *, debug: bool = False, drone: Drone, interpolating_paths: bool = True,
                  planning_toolkit: PlanningToolkit):
         """
         Construct a flight controller for a drone that tries to traverse a specified set of waypoints.
 
         :param debug:               Whether to enable debugging.
         :param drone:               The drone.
-        :param interpolate_paths:   Whether or not to interpolate the paths that are planned.
+        :param interpolating_paths: Whether or not we're interpolating the paths that are planned.
         :param planning_toolkit:    The planning toolkit (used for path planning).
         """
         super().__init__()
@@ -45,12 +45,14 @@ class TraverseWaypointsDroneController(DroneController):
         self.__ay: float = 10
         self.__debug: bool = debug
         self.__drone: Drone = drone
-        self.__interpolate_paths: bool = interpolate_paths
-        self.__path_tracking_range: float = 0.1 if interpolate_paths else 0.05
+        self.__interpolating_paths: bool = interpolating_paths
+        self.__path_tracking_range: float = 0.1 if interpolating_paths else 0.05
         self.__planning_toolkit: PlanningToolkit = planning_toolkit
         self.__should_terminate: threading.Event = threading.Event()
-        self.__traverse_path_controller: TraversePathDroneController = TraversePathDroneController(drone=drone)
-        self.__waypoint_capture_range: float = 0.1 if interpolate_paths else 0.025
+        self.__traverse_path_controller: TraversePathDroneController = TraversePathDroneController(
+            drone=drone, interpolating_paths=interpolating_paths
+        )
+        self.__waypoint_capture_range: float = 0.1 if interpolating_paths else 0.025
 
         # The shared variables, together with their lock.
         self.__current_pos: Optional[np.ndarray] = None
@@ -116,7 +118,7 @@ class TraverseWaypointsDroneController(DroneController):
     def get_path(self) -> Optional[Path]:
         """Get a copy of the path (if any), or None otherwise."""
         with self.__lock:
-            path: Optional[Path] = self.__interpolated_path if self.__interpolate_paths else self.__path
+            path: Optional[Path] = self.__interpolated_path if self.__interpolating_paths else self.__path
             return path.copy() if path is not None else None
 
     def get_waypoints(self) -> List[np.ndarray]:
@@ -196,7 +198,7 @@ class TraverseWaypointsDroneController(DroneController):
 
                 # TODO: Comment here.
                 self.__path = self.__update_path(self.__path, pull_strings=True)
-                if self.__interpolate_paths:
+                if self.__interpolating_paths:
                     self.__interpolated_path = self.__update_path(self.__interpolated_path, pull_strings=False)
 
                 # Check whether the drone has reached the first essential waypoint (if any), and remove it if so.
@@ -213,7 +215,7 @@ class TraverseWaypointsDroneController(DroneController):
 
             # Delegate path following to the 'traverse path' controller.
             self.__traverse_path_controller.set_path(
-                self.__interpolated_path if self.__interpolate_paths else self.__path
+                self.__interpolated_path if self.__interpolating_paths else self.__path
             )
             self.__traverse_path_controller.iterate(**kwargs)
 
@@ -368,7 +370,7 @@ class TraverseWaypointsDroneController(DroneController):
                         self.__path = new_path
 
                     # If interpolation is enabled, interpolate the path.
-                    if self.__interpolate_paths:
+                    if self.__interpolating_paths:
                         self.__interpolated_path = self.__path.interpolate() if self.__path is not None else None
 
                     # Decrease the number of new waypoints for which planned is still required, and reset the flag
