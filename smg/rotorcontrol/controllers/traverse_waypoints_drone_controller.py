@@ -206,7 +206,7 @@ class TraverseWaypointsDroneController(DroneController):
                 )
 
                 # TODO: Comment here.
-                if self.__interpolating_paths:
+                if self.__interpolating_paths and self.__interpolated_path is not None:
                     self.__interpolated_path = self.__update_path(
                         self.__interpolated_path, pull_strings=False, path_tracking_range=np.inf
                     )
