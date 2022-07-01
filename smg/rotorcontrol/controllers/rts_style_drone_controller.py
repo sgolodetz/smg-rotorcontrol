@@ -54,6 +54,7 @@ class RTSStyleDroneController(DroneController):
         self.__ground_pos: Optional[np.ndarray] = None
         self.__height_offset: float = 1.0
         self.__inner_controllers: Deque[DroneController] = deque()
+        self.__interpolate_paths: bool = False
         self.__left_mouse_down: bool = False
         self.__movement_allowed: bool = True
         self.__orienting_pos: Optional[np.ndarray] = None
@@ -98,7 +99,13 @@ class RTSStyleDroneController(DroneController):
             if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
                 self.__movement_allowed = not self.__movement_allowed
 
-            # If the user presses any other key, or clicks or releases a mouse button:
+            # Else if the user presses the 'i' key, toggle whether we're interpolating paths, and clear any
+            # inner controllers that are currently active.
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_i:
+                self.__interpolate_paths = not self.__interpolate_paths
+                self.__clear_inner_controllers()
+
+            # Else if the user presses any other key, or clicks or releases a mouse button:
             elif event.type == pygame.KEYDOWN \
                     or event.type == pygame.MOUSEBUTTONDOWN \
                     or event.type == pygame.MOUSEBUTTONUP:
@@ -118,7 +125,7 @@ class RTSStyleDroneController(DroneController):
                     # Try to make and set a new inner controller.
                     self.__try_set_new_inner_controller(event, drone_pos)
 
-            # If the user scrolls the mouse wheel, change the desired offset of the goal position above the floor.
+            # Else if the user scrolls the mouse wheel, change the desired offset of the goal position above the floor.
             elif event.type == pygame.MOUSEWHEEL:
                 self.__height_offset = np.clip(self.__height_offset + event.y * 0.2, 0.3, 3.0)
 
@@ -270,7 +277,8 @@ class RTSStyleDroneController(DroneController):
                         traverse_waypoints_controller = cast(TraverseWaypointsDroneController, last_inner_controller)
                     else:
                         traverse_waypoints_controller = TraverseWaypointsDroneController(
-                            debug=self.__debug, drone=self.__drone, planning_toolkit=self.__planning_toolkit
+                            debug=self.__debug, drone=self.__drone, interpolate_paths=self.__interpolate_paths,
+                            planning_toolkit=self.__planning_toolkit
                         )
 
                         # If we do construct a new controller, record that, as it will need to be appended to the queue.
@@ -342,7 +350,8 @@ class RTSStyleDroneController(DroneController):
                 if self.__pre_goal_pos is None or self.__goal_orientation_valid:
                     # Make a traverse waypoints controller.
                     traverse_waypoints_controller: TraverseWaypointsDroneController = TraverseWaypointsDroneController(
-                        debug=self.__debug, drone=self.__drone, planning_toolkit=self.__planning_toolkit
+                        debug=self.__debug, drone=self.__drone, interpolate_paths=self.__interpolate_paths,
+                        planning_toolkit=self.__planning_toolkit
                     )
 
                     # Set the waypoints of the controller.
@@ -422,6 +431,7 @@ class RTSStyleDroneController(DroneController):
             picked_pos = picking_image[my, mx]
             picked_pos = self.__planning_toolkit.pos_to_vpos(picked_pos)
             floating_pos = picked_pos + np.array([0, -self.__height_offset, 0])
+            floating_pos = self.__planning_toolkit.pos_to_vpos(floating_pos)
 
         # If the left mouse button is pressed:
         if pygame.mouse.get_pressed(num_buttons=3)[0]:

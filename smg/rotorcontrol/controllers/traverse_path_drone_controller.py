@@ -11,6 +11,7 @@ from smg.navigation import Path
 from smg.rigging.cameras import SimpleCamera
 from smg.rigging.helpers import CameraPoseConverter
 from smg.rotory.drones import Drone
+from smg.utility import GeometryUtil
 
 from .drone_controller import DroneController
 
@@ -20,15 +21,17 @@ class TraversePathDroneController(DroneController):
 
     # CONSTRUCTOR
 
-    def __init__(self, *, drone: Drone):
+    def __init__(self, *, drone: Drone, interpolating_paths: bool):
         """
         Construct a flight controller for a drone that tries to traverse a planned path.
 
-        :param drone:   The drone.
+        :param drone:               The drone.
+        :param interpolating_paths: Whether or not we're interpolating the paths that are planned.
         """
         super().__init__()
 
         self.__drone: Drone = drone
+        self.__interpolating_paths: bool = interpolating_paths
         self.__path: Optional[Path] = None
 
     # PUBLIC METHODS
@@ -76,9 +79,10 @@ class TraversePathDroneController(DroneController):
                 # Project the vector to the next waypoint into the horizontal plane.
                 horizontal_offset: np.ndarray = np.array([offset[0], 0, offset[2]])
 
-                # If we're far enough horizontally from the next waypoint to turn the drone before we get there:
+                # If we're far enough horizontally from the next waypoint to turn the drone before we get there,
+                # or this is an interpolated path and so we're continually turning:
                 horizontal_offset_length: float = np.linalg.norm(horizontal_offset)
-                if horizontal_offset_length >= 0.1:
+                if horizontal_offset_length >= 0.1 or self.__interpolating_paths:
                     # Determine the current orientation of the drone in the horizontal plane.
                     current_n: np.ndarray = vg.normalize(np.array([cam.n()[0], 0, cam.n()[2]]))
 
@@ -91,10 +95,10 @@ class TraversePathDroneController(DroneController):
                     sign: int = 1 if np.dot(cp, np.array([0, -1, 0])) >= 0 else -1
 
                     # Determine the angle by which the drone needs to turn to achieve the target orientation.
-                    angle: float = sign * np.arccos(np.clip(np.dot(current_n, target_n), -1.0, 1.0))
+                    angle: float = sign * GeometryUtil.angle_between(current_n, target_n)
 
                     # Determine an appropriate turn rate for the drone.
-                    turn_rate: float = np.clip(-angle / (np.pi / 2), -1.0, 1.0)
+                    turn_rate: float = self.__drone.calculate_turn_rate(rad_per_s=-angle)
 
                 # Otherwise, set both the angle by which the drone needs to turn and the turn rate to zero.
                 else:
@@ -105,15 +109,34 @@ class TraversePathDroneController(DroneController):
                 self.__drone.turn(turn_rate)
 
                 # Determine the linear rates at which the drone should in principle move in each of the three axes.
-                speed: float = 0.5
-                normalized_offset: np.ndarray = offset / offset_length
-                forward_rate: float = vg.scalar_projection(normalized_offset, cam.n()) * speed
-                right_rate: float = vg.scalar_projection(normalized_offset, -cam.u()) * speed
-                up_rate: float = vg.scalar_projection(normalized_offset, cam.v()) * speed
+                slowing_distance: float = self.__path.arc_length() if self.__interpolating_paths else offset_length
+                max_m_per_s: float = 0.5
+                m_per_s: float = max_m_per_s \
+                    if slowing_distance >= 0.5 else max(max_m_per_s * offset_length / 0.5, 0.25)
 
-                # If the drone's current orientation is within a reasonable angle of its target orientation,
-                # or alternatively if the drone is not currently turning, set the calculated linear rates.
-                if np.fabs(angle) * 180 / np.pi <= 30.0 or turn_rate == 0.0:
+                normalized_offset: np.ndarray = offset / offset_length
+                desired_forward_velocity: float = vg.scalar_projection(normalized_offset, cam.n()) * m_per_s
+                desired_right_velocity: float = vg.scalar_projection(normalized_offset, -cam.u()) * m_per_s
+                desired_up_velocity: float = vg.scalar_projection(normalized_offset, cam.v()) * m_per_s
+
+                forward_velocity: float = self.__drone.clip_forward_velocity(desired_forward_velocity)
+                right_velocity: float = self.__drone.clip_right_velocity(desired_right_velocity)
+                up_velocity: float = self.__drone.clip_up_velocity(desired_up_velocity)
+
+                min_fraction: float = min(
+                    forward_velocity / desired_forward_velocity if np.fabs(desired_forward_velocity) > 1e-4 else 1.0,
+                    right_velocity / desired_right_velocity if np.fabs(desired_right_velocity) > 1e-4 else 1.0,
+                    up_velocity / desired_up_velocity if np.fabs(desired_up_velocity) > 1e-4 else 1.0
+                )
+
+                forward_rate: float = self.__drone.calculate_forward_rate(min_fraction * desired_forward_velocity)
+                right_rate: float = self.__drone.calculate_right_rate(min_fraction * desired_right_velocity)
+                up_rate: float = self.__drone.calculate_up_rate(min_fraction * desired_up_velocity)
+
+                # If (i) the drone's current orientation is within a reasonable angle of its target orientation,
+                # or (ii) the drone is not currently turning, or (iii) we're flying an interpolated path and so
+                # we don't want to keep stopping unnecessarily, set the calculated linear rates.
+                if np.fabs(angle) * 180 / np.pi <= 30.0 or turn_rate == 0.0 or self.__interpolating_paths:
                     self.__drone.move_forward(forward_rate)
                     self.__drone.move_right(right_rate)
                     self.__drone.move_up(up_rate)
