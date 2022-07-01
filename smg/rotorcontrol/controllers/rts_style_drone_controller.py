@@ -97,7 +97,8 @@ class RTSStyleDroneController(DroneController):
             if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
                 self.__movement_allowed = not self.__movement_allowed
 
-            # Else if the user presses the 'i' key, toggle whether we're interpolating paths.
+            # Else if the user presses the 'i' key, toggle whether we're interpolating paths, and clear any
+            # inner controllers that are currently active.
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_i:
                 self.__interpolate_paths = not self.__interpolate_paths
                 self.__clear_inner_controllers()
@@ -122,7 +123,7 @@ class RTSStyleDroneController(DroneController):
                     # Try to make and set a new inner controller.
                     self.__try_set_new_inner_controller(event, drone_pos)
 
-            # If the user scrolls the mouse wheel, change the desired offset of the goal position above the floor.
+            # Else if the user scrolls the mouse wheel, change the desired offset of the goal position above the floor.
             elif event.type == pygame.MOUSEWHEEL:
                 self.__height_offset = np.clip(self.__height_offset + event.y * 0.2, 0.3, 3.0)
 
