@@ -28,12 +28,14 @@ class TraverseWaypointsDroneController(DroneController):
 
     # CONSTRUCTOR
 
-    def __init__(self, *, debug: bool = False, drone: Drone, planning_toolkit: PlanningToolkit):
+    def __init__(self, *, debug: bool = False, drone: Drone, interpolate_paths: bool,
+                 planning_toolkit: PlanningToolkit):
         """
         Construct a flight controller for a drone that tries to traverse a specified set of waypoints.
 
         :param debug:               Whether to enable debugging.
         :param drone:               The drone.
+        :param interpolate_paths:   Whether or not to interpolate the paths that are planned.
         :param planning_toolkit:    The planning toolkit (used for path planning).
         """
         super().__init__()
@@ -43,14 +45,18 @@ class TraverseWaypointsDroneController(DroneController):
         self.__ay: float = 10
         self.__debug: bool = debug
         self.__drone: Drone = drone
-        self.__path_tracking_range: float = 0.05
+        self.__interpolate_paths: bool = interpolate_paths
+        self.__path_tracking_range: float = 0.1 if interpolate_paths else 0.05
         self.__planning_toolkit: PlanningToolkit = planning_toolkit
         self.__should_terminate: threading.Event = threading.Event()
-        self.__traverse_path_controller: TraversePathDroneController = TraversePathDroneController(drone=drone)
-        self.__waypoint_capture_range: float = 0.025
+        self.__traverse_path_controller: TraversePathDroneController = TraversePathDroneController(
+            drone=drone, interpolating_paths=interpolate_paths
+        )
+        self.__waypoint_capture_range: float = 0.1 if interpolate_paths else 0.025
 
         # The shared variables, together with their lock.
         self.__current_pos: Optional[np.ndarray] = None
+        self.__interpolated_path: Optional[Path] = None
         self.__lock: threading.Lock = threading.Lock()
         self.__new_waypoint_count: int = 0
         self.__path: Optional[Path] = None
@@ -104,6 +110,11 @@ class TraverseWaypointsDroneController(DroneController):
         """
         return Drone.FLYING
 
+    def get_interpolated_path(self) -> Optional[Path]:
+        """Get a copy of the interpolated path (if any), or None otherwise."""
+        with self.__lock:
+            return self.__interpolated_path.copy() if self.__interpolated_path is not None else None
+
     def get_new_waypoints(self) -> List[np.ndarray]:
         """Get any new (i.e. as yet unplanned) waypoints that the drone should traverse."""
         with self.__lock:
@@ -111,7 +122,8 @@ class TraverseWaypointsDroneController(DroneController):
 
     def get_path(self) -> Optional[Path]:
         """Get a copy of the path (if any), or None otherwise."""
-        return self.__path.copy() if self.__path is not None else None
+        with self.__lock:
+            return self.__path.copy() if self.__path is not None else None
 
     def get_waypoints(self) -> List[np.ndarray]:
         """Get the waypoints that the drone should traverse."""
@@ -188,27 +200,19 @@ class TraverseWaypointsDroneController(DroneController):
                 if self.__debug:
                     start = timer()
 
-                # First try to update the path whilst maintaining sufficient clearance.
-                new_path = self.__planner.update_path(
-                    self.__current_pos, self.__path, debug=self.__debug,
-                    d=PlanningToolkit.l1_distance(ay=self.__ay), h=PlanningToolkit.l1_distance(ay=self.__ay),
-                    allow_shortcuts=True, pull_strings=True, use_clearance=True,
-                    path_tracking_range=self.__path_tracking_range,
-                    waypoint_capture_range=self.__waypoint_capture_range
+                # Try to update the current path (the non-interpolated one).
+                self.__path = self.__update_path(
+                    self.__path, pull_strings=True, path_tracking_range=self.__path_tracking_range
                 )
 
-                # If that doesn't work, fall back to updating the path without requiring sufficient clearance,
-                # on the basis that it will probably work in any case.
-                if new_path is None:
-                    new_path = self.__planner.update_path(
-                        self.__current_pos, self.__path, debug=self.__debug,
-                        d=PlanningToolkit.l1_distance(ay=self.__ay), h=PlanningToolkit.l1_distance(ay=self.__ay),
-                        allow_shortcuts=True, pull_strings=True, use_clearance=False,
-                        path_tracking_range=self.__path_tracking_range,
-                        waypoint_capture_range=self.__waypoint_capture_range
+                # If we're interpolating the path, and the interpolated path exists, also update that.
+                # Note that we don't apply string pulling to the interpolated path, or allow it to be
+                # independently re-planned if we deviate too far from it (if we do deviate too far,
+                # the underlying waypoint path will be re-planned and then re-interpolated).
+                if self.__interpolate_paths and self.__interpolated_path is not None:
+                    self.__interpolated_path = self.__update_path(
+                        self.__interpolated_path, pull_strings=False, path_tracking_range=np.inf
                     )
-
-                self.__path = new_path
 
                 # Check whether the drone has reached the first essential waypoint (if any), and remove it if so.
                 next_waypoint_distance: float = np.linalg.norm(self.__current_pos - self.__waypoints[0])
@@ -223,18 +227,21 @@ class TraverseWaypointsDroneController(DroneController):
             # --- Step 4: Make Drone Follow Current Path --- #
 
             # Delegate path following to the 'traverse path' controller.
-            self.__traverse_path_controller.set_path(self.__path)
+            self.__traverse_path_controller.set_path(
+                self.__interpolated_path if self.__interpolate_paths else self.__path
+            )
             self.__traverse_path_controller.iterate(**kwargs)
 
     def render_ui(self) -> None:
         """Render the user interface for the controller."""
         # Render the path that the drone is following (if any).
-        path: Optional[Path] = self.get_path()
-        if path is not None:
-            path.render(
-                start_colour=(0, 1, 1), end_colour=(0, 1, 1), width=5,
-                waypoint_colourer=self.__planning_toolkit.occupancy_colourer()
-            )
+        for path in [self.get_interpolated_path(), self.get_path()]:
+            if path is not None:
+                path.render(
+                    start_colour=(0, 1, 1), end_colour=(0, 1, 1), width=5,
+                    waypoint_colourer=self.__planning_toolkit.occupancy_colourer()
+                )
+                break
 
         # Render any new waypoints for which a path has not yet been planned.
         # FIXME: This is currently a bit messy - it needs tidying up and moving somewhere more sensible.
@@ -376,6 +383,10 @@ class TraverseWaypointsDroneController(DroneController):
                     else:
                         self.__path = new_path
 
+                    # If interpolation is enabled, interpolate the path.
+                    if self.__interpolate_paths:
+                        self.__interpolated_path = self.__path.interpolate() if self.__path is not None else None
+
                     # Decrease the number of new waypoints for which planned is still required, and reset the flag
                     # indicating that planning is needed. If there are still waypoints outstanding, path planning
                     # will shortly be triggered again by the main thread in any case.
@@ -387,3 +398,33 @@ class TraverseWaypointsDroneController(DroneController):
 
             # Wait for 10ms before performing any further path planning, so as to avoid a spin loop.
             time.sleep(0.01)
+
+    def __update_path(self, path: Path, *, pull_strings: bool, path_tracking_range: float) -> Optional[Path]:
+        """
+        Try to update the specified path based on the drone's current position.
+
+        :param path:                    The path to update.
+        :param pull_strings:            Whether to perform string pulling on the path prior to returning it.
+        :param path_tracking_range:     The maximum distance to the current path segment for the agent to be
+                                        considered within range of the path (making re-planning unnecessary).
+        :return:                        The updated path, if successful, or None otherwise.
+        """
+        # First try to update the path whilst maintaining sufficient clearance.
+        new_path = self.__planner.update_path(
+            self.__current_pos, path, debug=self.__debug,
+            d=PlanningToolkit.l1_distance(ay=self.__ay), h=PlanningToolkit.l1_distance(ay=self.__ay),
+            allow_shortcuts=True, pull_strings=pull_strings, use_clearance=True,
+            path_tracking_range=path_tracking_range, waypoint_capture_range=self.__waypoint_capture_range
+        )
+
+        # If that doesn't work, fall back to updating the path without requiring sufficient clearance,
+        # on the basis that it will probably work in any case.
+        if new_path is None:
+            new_path = self.__planner.update_path(
+                self.__current_pos, path, debug=self.__debug,
+                d=PlanningToolkit.l1_distance(ay=self.__ay), h=PlanningToolkit.l1_distance(ay=self.__ay),
+                allow_shortcuts=True, pull_strings=pull_strings, use_clearance=False,
+                path_tracking_range=path_tracking_range, waypoint_capture_range=self.__waypoint_capture_range
+            )
+
+        return new_path
