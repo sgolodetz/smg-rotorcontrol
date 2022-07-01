@@ -232,12 +232,13 @@ class TraverseWaypointsDroneController(DroneController):
     def render_ui(self) -> None:
         """Render the user interface for the controller."""
         # Render the path that the drone is following (if any).
-        for path in [self.get_interpolated_path()]:
+        for path in [self.get_interpolated_path(), self.get_path()]:
             if path is not None:
                 path.render(
                     start_colour=(0, 1, 1), end_colour=(0, 1, 1), width=5,
                     waypoint_colourer=self.__planning_toolkit.occupancy_colourer()
                 )
+                break
 
         # Render any new waypoints for which a path has not yet been planned.
         # FIXME: This is currently a bit messy - it needs tidying up and moving somewhere more sensible.

@@ -79,8 +79,8 @@ class TraversePathDroneController(DroneController):
                 # Project the vector to the next waypoint into the horizontal plane.
                 horizontal_offset: np.ndarray = np.array([offset[0], 0, offset[2]])
 
-                # If we're far enough horizontally from the next waypoint to turn the drone before we get there:
-                # FIXME: Fix this comment.
+                # If we're far enough horizontally from the next waypoint to turn the drone before we get there,
+                # or this is an interpolated path and so we're continually turning:
                 horizontal_offset_length: float = np.linalg.norm(horizontal_offset)
                 if horizontal_offset_length >= 0.1 or self.__interpolating_paths:
                     # Determine the current orientation of the drone in the horizontal plane.
@@ -109,13 +109,10 @@ class TraversePathDroneController(DroneController):
                 self.__drone.turn(turn_rate)
 
                 # Determine the linear rates at which the drone should in principle move in each of the three axes.
-                # FIXME: The drone should slow down for essential waypoints even with an interpolated path.
+                slowing_distance: float = self.__path.arc_length() if self.__interpolating_paths else offset_length
                 max_m_per_s: float = 0.5
-                # m_per_s: float = max_m_per_s \
-                #     if offset_length >= 0.5 or self.__interpolating_paths \
-                #     else max(max_m_per_s * offset_length / 0.5, 0.25)
-                foo: float = self.__path.arc_length() if self.__interpolating_paths else offset_length
-                m_per_s: float = max_m_per_s if foo >= 0.5 else max(max_m_per_s * offset_length / 0.5, 0.25)
+                m_per_s: float = max_m_per_s \
+                    if slowing_distance >= 0.5 else max(max_m_per_s * offset_length / 0.5, 0.25)
 
                 normalized_offset: np.ndarray = offset / offset_length
                 desired_forward_velocity: float = vg.scalar_projection(normalized_offset, cam.n()) * m_per_s
