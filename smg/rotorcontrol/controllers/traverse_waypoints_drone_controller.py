@@ -28,14 +28,14 @@ class TraverseWaypointsDroneController(DroneController):
 
     # CONSTRUCTOR
 
-    def __init__(self, *, debug: bool = False, drone: Drone, interpolating_paths: bool = True,
+    def __init__(self, *, debug: bool = False, drone: Drone, interpolate_paths: bool,
                  planning_toolkit: PlanningToolkit):
         """
         Construct a flight controller for a drone that tries to traverse a specified set of waypoints.
 
         :param debug:               Whether to enable debugging.
         :param drone:               The drone.
-        :param interpolating_paths: Whether or not we're interpolating the paths that are planned.
+        :param interpolate_paths:   Whether or not to interpolate the paths that are planned.
         :param planning_toolkit:    The planning toolkit (used for path planning).
         """
         super().__init__()
@@ -45,14 +45,14 @@ class TraverseWaypointsDroneController(DroneController):
         self.__ay: float = 10
         self.__debug: bool = debug
         self.__drone: Drone = drone
-        self.__interpolating_paths: bool = interpolating_paths
-        self.__path_tracking_range: float = 0.1 if interpolating_paths else 0.05
+        self.__interpolate_paths: bool = interpolate_paths
+        self.__path_tracking_range: float = 0.1 if interpolate_paths else 0.05
         self.__planning_toolkit: PlanningToolkit = planning_toolkit
         self.__should_terminate: threading.Event = threading.Event()
         self.__traverse_path_controller: TraversePathDroneController = TraversePathDroneController(
-            drone=drone, interpolating_paths=interpolating_paths
+            drone=drone, interpolating_paths=interpolate_paths
         )
-        self.__waypoint_capture_range: float = 0.1 if interpolating_paths else 0.025
+        self.__waypoint_capture_range: float = 0.1 if interpolate_paths else 0.025
 
         # The shared variables, together with their lock.
         self.__current_pos: Optional[np.ndarray] = None
@@ -209,7 +209,7 @@ class TraverseWaypointsDroneController(DroneController):
                 # Note that we don't apply string pulling to the interpolated path, or allow it to be
                 # independently re-planned if we deviate too far from it (if we do deviate too far,
                 # the underlying waypoint path will be re-planned and then re-interpolated).
-                if self.__interpolating_paths and self.__interpolated_path is not None:
+                if self.__interpolate_paths and self.__interpolated_path is not None:
                     self.__interpolated_path = self.__update_path(
                         self.__interpolated_path, pull_strings=False, path_tracking_range=np.inf
                     )
@@ -228,7 +228,7 @@ class TraverseWaypointsDroneController(DroneController):
 
             # Delegate path following to the 'traverse path' controller.
             self.__traverse_path_controller.set_path(
-                self.__interpolated_path if self.__interpolating_paths else self.__path
+                self.__interpolated_path if self.__interpolate_paths else self.__path
             )
             self.__traverse_path_controller.iterate(**kwargs)
 
@@ -384,7 +384,7 @@ class TraverseWaypointsDroneController(DroneController):
                         self.__path = new_path
 
                     # If interpolation is enabled, interpolate the path.
-                    if self.__interpolating_paths:
+                    if self.__interpolate_paths:
                         self.__interpolated_path = self.__path.interpolate() if self.__path is not None else None
 
                     # Decrease the number of new waypoints for which planned is still required, and reset the flag
