@@ -133,9 +133,10 @@ class TraversePathDroneController(DroneController):
                 right_rate: float = self.__drone.calculate_right_rate(min_fraction * desired_right_velocity)
                 up_rate: float = self.__drone.calculate_up_rate(min_fraction * desired_up_velocity)
 
-                # If the drone's current orientation is within a reasonable angle of its target orientation,
-                # or alternatively if the drone is not currently turning, set the calculated linear rates.
-                if np.fabs(angle) * 180 / np.pi <= 30.0 or turn_rate == 0.0:
+                # If (i) the drone's current orientation is within a reasonable angle of its target orientation,
+                # or (ii) the drone is not currently turning, or (iii) we're flying an interpolated path and so
+                # we don't want to keep stopping unnecessarily, set the calculated linear rates.
+                if np.fabs(angle) * 180 / np.pi <= 30.0 or turn_rate == 0.0 or self.__interpolating_paths:
                     self.__drone.move_forward(forward_rate)
                     self.__drone.move_right(right_rate)
                     self.__drone.move_up(up_rate)
