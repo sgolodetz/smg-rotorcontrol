@@ -111,9 +111,11 @@ class TraversePathDroneController(DroneController):
                 # Determine the linear rates at which the drone should in principle move in each of the three axes.
                 # FIXME: The drone should slow down for essential waypoints even with an interpolated path.
                 max_m_per_s: float = 0.5
-                m_per_s: float = max_m_per_s \
-                    if offset_length >= 0.5 or self.__interpolating_paths \
-                    else max(max_m_per_s * offset_length / 0.5, 0.25)
+                # m_per_s: float = max_m_per_s \
+                #     if offset_length >= 0.5 or self.__interpolating_paths \
+                #     else max(max_m_per_s * offset_length / 0.5, 0.25)
+                foo: float = self.__path.arc_length() if self.__interpolating_paths else offset_length
+                m_per_s: float = max_m_per_s if foo >= 0.5 else max(max_m_per_s * offset_length / 0.5, 0.25)
 
                 normalized_offset: np.ndarray = offset / offset_length
                 desired_forward_velocity: float = vg.scalar_projection(normalized_offset, cam.n()) * m_per_s
@@ -136,8 +138,7 @@ class TraversePathDroneController(DroneController):
 
                 # If the drone's current orientation is within a reasonable angle of its target orientation,
                 # or alternatively if the drone is not currently turning, set the calculated linear rates.
-                # FIXME: Fix this comment.
-                if np.fabs(angle) * 180 / np.pi <= 30.0 or turn_rate == 0.0 or self.__interpolating_paths:
+                if np.fabs(angle) * 180 / np.pi <= 30.0 or turn_rate == 0.0:
                     self.__drone.move_forward(forward_rate)
                     self.__drone.move_right(right_rate)
                     self.__drone.move_up(up_rate)
