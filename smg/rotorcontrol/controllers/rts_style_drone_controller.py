@@ -54,6 +54,7 @@ class RTSStyleDroneController(DroneController):
         self.__ground_pos: Optional[np.ndarray] = None
         self.__height_offset: float = 1.0
         self.__inner_controllers: Deque[DroneController] = deque()
+        self.__interpolate_paths: bool = False
         self.__left_mouse_down: bool = False
         self.__movement_allowed: bool = True
         self.__orienting_pos: Optional[np.ndarray] = None
@@ -106,6 +107,12 @@ class RTSStyleDroneController(DroneController):
             # If the user presses the 'space' key, toggle whether the drone is allowed to move.
             if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
                 self.__movement_allowed = not self.__movement_allowed
+
+            # Else if the user presses the 'i' key, toggle whether we're interpolating paths, and clear any
+            # inner controllers that are currently active.
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_i:
+                self.__interpolate_paths = not self.__interpolate_paths
+                self.__clear_inner_controllers()
 
             # Else if the user presses the 'b' key and a goal position has been determined:
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_b and self.__goal_pos is not None:
@@ -340,7 +347,8 @@ class RTSStyleDroneController(DroneController):
                         traverse_waypoints_controller = cast(TraverseWaypointsDroneController, last_inner_controller)
                     else:
                         traverse_waypoints_controller = TraverseWaypointsDroneController(
-                            debug=self.__debug, drone=self.__drone, planning_toolkit=self.__planning_toolkit
+                            debug=self.__debug, drone=self.__drone, interpolate_paths=self.__interpolate_paths,
+                            planning_toolkit=self.__planning_toolkit
                         )
 
                         # If we do construct a new controller, record that, as it will need to be appended to the queue.
@@ -403,7 +411,8 @@ class RTSStyleDroneController(DroneController):
                 if self.__pre_goal_pos is None or self.__goal_orientation_valid:
                     # Make a traverse waypoints controller.
                     traverse_waypoints_controller: TraverseWaypointsDroneController = TraverseWaypointsDroneController(
-                        debug=self.__debug, drone=self.__drone, planning_toolkit=self.__planning_toolkit
+                        debug=self.__debug, drone=self.__drone, interpolate_paths=self.__interpolate_paths,
+                        planning_toolkit=self.__planning_toolkit
                     )
 
                     # Set the waypoints of the controller.
