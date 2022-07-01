@@ -200,12 +200,15 @@ class TraverseWaypointsDroneController(DroneController):
                 if self.__debug:
                     start = timer()
 
-                # TODO: Comment here.
+                # Try to update the current path (the non-interpolated one).
                 self.__path = self.__update_path(
                     self.__path, pull_strings=True, path_tracking_range=self.__path_tracking_range
                 )
 
-                # TODO: Comment here.
+                # If we're interpolating the path, and the interpolated path exists, also update that.
+                # Note that we don't apply string pulling to the interpolated path, or allow it to be
+                # independently re-planned if we deviate too far from it (if we do deviate too far,
+                # the underlying waypoint path will be re-planned and then re-interpolated).
                 if self.__interpolating_paths and self.__interpolated_path is not None:
                     self.__interpolated_path = self.__update_path(
                         self.__interpolated_path, pull_strings=False, path_tracking_range=np.inf
@@ -398,12 +401,13 @@ class TraverseWaypointsDroneController(DroneController):
 
     def __update_path(self, path: Path, *, pull_strings: bool, path_tracking_range: float) -> Optional[Path]:
         """
-        TODO
+        Try to update the specified path based on the drone's current position.
 
-        :param path:                TODO
-        :param pull_strings:        TODO
-        :param path_tracking_range: TODO
-        :return:                    TODO
+        :param path:                    The path to update.
+        :param pull_strings:            Whether to perform string pulling on the path prior to returning it.
+        :param path_tracking_range:     The maximum distance to the current path segment for the agent to be
+                                        considered within range of the path (making re-planning unnecessary).
+        :return:                        The updated path, if successful, or None otherwise.
         """
         # First try to update the path whilst maintaining sufficient clearance.
         new_path = self.__planner.update_path(
