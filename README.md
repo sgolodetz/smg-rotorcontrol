@@ -12,11 +12,7 @@ Note: Please read the [top-level README](https://github.com/sgolodetz/smglib/blo
 
 2. Check out the `master` branch.
 
-3. Activate the Conda environment, e.g.
-
-```
-conda activate smglib
-```
+3. Activate the Conda environment, e.g. `conda activate smglib`.
 
 4. Run `pip install -e .` at the terminal. (Note: If you might want to use the AWS Transcribe voice-based drone controller, use `pip install -e .[all]` instead.)
 
