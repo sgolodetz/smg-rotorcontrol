@@ -121,7 +121,7 @@ class RTSStyleDroneController(DroneController):
                     # TODO
                     self.__beacon_localiser.set_fake_beacon("Foo", None)
                 else:
-                    # Set a test beacon at the goal position, with a maximum range of 2m.
+                    # Set a fake beacon at the goal position, with a maximum range of 2m.
                     self.__beacon_localiser.set_fake_beacon("Foo", Beacon(self.__goal_pos, 2.0, Beacon.BT_FAKE))
 
             # Else if the user presses a key, or clicks or releases a mouse button:
