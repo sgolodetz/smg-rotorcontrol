@@ -58,6 +58,11 @@ class TraversePathDroneController(DroneController):
                                     is running (optional). Note that if the tracker is monocular, the transformation is
                                     unlikely to be scale-correct.
         """
+        # If no tracker pose has been passed in, stop the drone and early out.
+        if tracker_c_t_i is None:
+            self.__drone.stop()
+            return
+
         # Extract the current position of the drone from the tracker pose provided.
         current_pos: np.ndarray = DroneController._extract_current_pos(tracker_c_t_i)
 

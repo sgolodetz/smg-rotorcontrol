@@ -110,13 +110,12 @@ class RTSStyleDroneController(DroneController):
                 # If the user is currently pressing one of the shift keys (indicating that an append is desired),
                 # and the last inner controller is not None (indicating that an append is possible):
                 last_inner_controller: Optional[DroneController] = self.__get_last_inner_controller()
-
                 if (pygame.key.get_mods() & pygame.KMOD_SHIFT) and last_inner_controller is not None:
                     # Try to make and append a new inner controller.
                     self.__try_append_new_inner_controller(event, last_inner_controller)
 
-                # Otherwise:
-                else:
+                # Otherwise, if the tracker pose is available:
+                elif tracker_c_t_i is not None:
                     # Extract the current position of the drone from the tracker pose provided.
                     drone_pos: np.ndarray = DroneController._extract_current_pos(tracker_c_t_i)
 
