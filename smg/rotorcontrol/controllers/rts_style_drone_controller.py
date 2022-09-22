@@ -93,13 +93,18 @@ class RTSStyleDroneController(DroneController):
         # Update the goal that the user wants the drone to achieve.
         self.__update_goal()
 
-        # TODO
+        # If the tracker pose is available:
         if tracker_c_t_i is not None:
+            # Extract the current position of the drone from the tracker pose provided.
             drone_pos: np.ndarray = DroneController._extract_current_pos(tracker_c_t_i)
+
+            # Get the estimated ranges (in m) between the drone and any beacons that are within range.
             beacon_ranges: Dict[str, float] = self.__drone.get_beacon_ranges(
                 drone_pos, fake_beacons=self.__beacon_localiser.get_fake_beacons()
             )
-            # print(f"Beacon Ranges: {beacon_ranges}")
+
+            # Add to the localiser measurements of the ranges to those beacons that are within range
+            # from the current drone position.
             self.__beacon_localiser.add_beacon_measurements(drone_pos, beacon_ranges)
 
         # Process any PyGame events that have happened since the last iteration.
@@ -114,15 +119,17 @@ class RTSStyleDroneController(DroneController):
                 self.__interpolate_paths = not self.__interpolate_paths
                 self.__clear_inner_controllers()
 
-            # Else if the user presses the 'b' key and a goal position has been determined:
-            elif event.type == pygame.KEYDOWN and event.key == pygame.K_b and self.__goal_pos is not None:
-                # TODO
+            # Else if the user presses the 'b' key:
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_b:
+                # If the user is currently pressing one of the shift keys:
                 if pygame.key.get_mods() & pygame.KMOD_SHIFT:
-                    # TODO
-                    self.__beacon_localiser.set_fake_beacon("Foo", None)
-                else:
-                    # Set a fake beacon at the goal position, with a maximum range of 2m.
-                    self.__beacon_localiser.set_fake_beacon("Foo", Beacon(self.__goal_pos, 2.0, Beacon.BT_FAKE))
+                    # Clear any existing fake beacon called 'Fake'.
+                    self.__beacon_localiser.set_fake_beacon("Fake", None)
+
+                # Otherwise, if a goal position has been determined:
+                elif self.__goal_pos is not None:
+                    # Set a fake beacon called 'Fake' at the goal position, with a maximum range of 2m.
+                    self.__beacon_localiser.set_fake_beacon("Fake", Beacon(self.__goal_pos, 2.0, Beacon.BT_FAKE))
 
             # Else if the user presses a key, or clicks or releases a mouse button:
             elif event.type == pygame.KEYDOWN \
