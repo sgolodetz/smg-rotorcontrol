@@ -14,6 +14,7 @@ from smg.opengl import OpenGLUtil
 from smg.pyoctomap import OctomapPicker
 from smg.rigging.cameras import Camera
 from smg.rigging.helpers import CameraPoseConverter
+from smg.rotory.beacons import Beacon, BeaconLocaliser
 from smg.rotory.drones import Drone
 
 from .drone_controller import DroneController
@@ -47,6 +48,7 @@ class RTSStyleDroneController(DroneController):
         if planning_toolkit is None:
             raise RuntimeError("Error: An RTS-style drone controller requires a planning toolkit for the scene")
 
+        self.__beacon_localiser: BeaconLocaliser = BeaconLocaliser()
         self.__debug: bool = debug
         self.__drone: Drone = drone
         self.__goal_orientation_valid: bool = False
@@ -93,6 +95,20 @@ class RTSStyleDroneController(DroneController):
         # Update the goal that the user wants the drone to achieve.
         self.__update_goal()
 
+        # If the tracker pose is available:
+        if tracker_c_t_i is not None:
+            # Extract the current position of the drone from the tracker pose provided.
+            drone_pos: np.ndarray = DroneController._extract_current_pos(tracker_c_t_i)
+
+            # Get the estimated ranges (in m) between the drone and any beacons that are within range.
+            beacon_ranges: Dict[str, float] = self.__drone.get_beacon_ranges(
+                drone_pos, fake_beacons=self.__beacon_localiser.get_fake_beacons()
+            )
+
+            # Add to the localiser measurements of the ranges to those beacons that are within range
+            # from the current drone position.
+            self.__beacon_localiser.add_beacon_measurements(drone_pos, beacon_ranges)
+
         # Process any PyGame events that have happened since the last iteration.
         for event in events:
             # If the user presses the 'space' key, toggle whether the drone is allowed to move.
@@ -105,7 +121,19 @@ class RTSStyleDroneController(DroneController):
                 self.__interpolate_paths = not self.__interpolate_paths
                 self.__clear_inner_controllers()
 
-            # Else if the user presses any other key, or clicks or releases a mouse button:
+            # Else if the user presses the 'b' key:
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_b:
+                # If the user is currently pressing one of the shift keys:
+                if pygame.key.get_mods() & pygame.KMOD_SHIFT:
+                    # Clear any existing fake beacon called 'Fake'.
+                    self.__beacon_localiser.set_fake_beacon("Fake", None)
+
+                # Otherwise, if a goal position has been determined:
+                elif self.__goal_pos is not None:
+                    # Set a fake beacon called 'Fake' at the goal position, with a maximum range of 2m.
+                    self.__beacon_localiser.set_fake_beacon("Fake", Beacon(self.__goal_pos, 2.0, Beacon.BT_FAKE))
+
+            # Else if the user presses a key, or clicks or releases a mouse button:
             elif event.type == pygame.KEYDOWN \
                     or event.type == pygame.MOUSEBUTTONDOWN \
                     or event.type == pygame.MOUSEBUTTONUP:
@@ -168,10 +196,15 @@ class RTSStyleDroneController(DroneController):
                 OpenGLUtil.render_cylinder(self.__pre_goal_pos, join_pos, 0.05, 0.05, slices=10)
                 OpenGLUtil.render_cylinder(join_pos, self.__orienting_pos, 0.15, 0.0, slices=10)
 
+        # Render any known beacons.
+        self.__render_beacons()
+
     def terminate(self) -> None:
         """Tell the controller to terminate."""
         for inner_controller in self.__inner_controllers:
             inner_controller.terminate()
+
+        self.__beacon_localiser.terminate()
 
     # PRIVATE METHODS
 
@@ -227,6 +260,63 @@ class RTSStyleDroneController(DroneController):
         :return:    The last inner controller (if any), or None otherwise.
         """
         return self.__inner_controllers[-1] if len(self.__inner_controllers) > 0 else None
+
+    def __render_beacons(self) -> None:
+        """Render any known beacons."""
+        # Disable writing to the depth buffer. (This is to avoid the drone being blocked by the beacons.)
+        glDepthMask(False)
+
+        # Enable blending.
+        glEnable(GL_BLEND)
+        glBlendColor(0.25, 0.25, 0.25, 0.25)
+        glBlendFunc(GL_CONSTANT_COLOR, GL_ONE_MINUS_CONSTANT_COLOR)
+
+        # Get the beacons and beacon measurements from the localiser.
+        beacons: Dict[str, Beacon] = self.__beacon_localiser.get_beacons()
+        beacon_measurements: Dict[str, List[Tuple[np.ndarray, float]]] = \
+            self.__beacon_localiser.get_beacon_measurements()
+
+        # Render the beacons.
+        for _, beacon in beacons.items():
+            if beacon.beacon_type == Beacon.BT_FAKE:
+                glColor3f(1, 1, 0)
+            elif beacon.beacon_type == Beacon.BT_LOCALISED:
+                glColor3f(0, 1, 1)
+
+            OpenGLUtil.render_sphere(beacon.position, beacon.max_range, slices=30, stacks=30)
+
+        # Render each set of beacon measurements.
+        glBegin(GL_LINES)
+
+        for beacon_name, measurements_for_beacon in beacon_measurements.items():
+            # If there is no localised beacon associated with this set of measurements, early out.
+            if beacons.get(f"L_{beacon_name}") is None:
+                continue
+
+            # Get the position of the localised beacon.
+            beacon_pos: np.ndarray = beacons[f"L_{beacon_name}"].position
+
+            # For each beacon measurement in the set:
+            for receiver_pos, beacon_range in measurements_for_beacon:
+                # Compute the measurement error.
+                measurement_err: float = abs(np.linalg.norm(receiver_pos - beacon_pos) - beacon_range)
+
+                # Set the current colour based on the measurement error (0cm is green, >= 10cm is red).
+                t: float = np.clip(measurement_err / 0.1, 0.0, 1.0)
+                glColor3f(t, 1 - t, 0)
+
+                # Draw a line between the position of the receiver when the measurement was taken and the
+                # position of the localised beacon.
+                glVertex3f(*receiver_pos)
+                glVertex3f(*beacon_pos)
+
+        glEnd()
+
+        # Disable blending again.
+        glDisable(GL_BLEND)
+
+        # Enable writing to the depth buffer again.
+        glDepthMask(True)
 
     def __render_traversability_sphere(self, pos: np.ndarray, *, radius: float) -> None:
         """
