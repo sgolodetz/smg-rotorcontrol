@@ -46,7 +46,7 @@ class TraverseWaypointsDroneController(DroneController):
         self.__debug: bool = debug
         self.__drone: Drone = drone
         self.__interpolate_paths: bool = interpolate_paths
-        self.__path_tracking_range: float = 0.1 if interpolate_paths else 0.1
+        self.__path_tracking_range: float = 0.1 if interpolate_paths else 0.05
         self.__planning_toolkit: PlanningToolkit = planning_toolkit
         self.__should_terminate: threading.Event = threading.Event()
         self.__traverse_path_controller: TraversePathDroneController = TraversePathDroneController(

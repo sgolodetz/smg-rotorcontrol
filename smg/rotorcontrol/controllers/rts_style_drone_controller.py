@@ -283,20 +283,31 @@ class RTSStyleDroneController(DroneController):
 
             OpenGLUtil.render_sphere(beacon.position, beacon.max_range, slices=30, stacks=30)
 
-        # Render the beacon measurements.
+        # Render each set of beacon measurements.
         glBegin(GL_LINES)
+
         for beacon_name, measurements_for_beacon in beacon_measurements.items():
+            # If there is no localised beacon associated with this set of measurements, early out.
             if beacons.get(f"L_{beacon_name}") is None:
                 continue
 
+            # Get the position of the localised beacon.
+            beacon_pos: np.ndarray = beacons[f"L_{beacon_name}"].position
+
+            # For each beacon measurement in the set:
             for receiver_pos, beacon_range in measurements_for_beacon:
-                beacon_pos: np.ndarray = beacons[f"L_{beacon_name}"].position
+                # Compute the measurement error.
                 measurement_err: float = abs(np.linalg.norm(receiver_pos - beacon_pos) - beacon_range)
+
+                # Set the current colour based on the measurement error (0cm is green, >= 10cm is red).
                 t: float = np.clip(measurement_err / 0.1, 0.0, 1.0)
                 glColor3f(t, 1 - t, 0)
 
+                # Draw a line between the position of the receiver when the measurement was taken and the
+                # position of the localised beacon.
                 glVertex3f(*receiver_pos)
                 glVertex3f(*beacon_pos)
+
         glEnd()
 
         # Disable blending again.
