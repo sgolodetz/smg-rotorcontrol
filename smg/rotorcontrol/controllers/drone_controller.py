@@ -19,6 +19,16 @@ class DroneController(ABC):
         """Construct a flight controller for a drone."""
         self.__expected_start_pos: Optional[np.ndarray] = None
 
+    # SPECIAL METHODS
+
+    def __enter__(self):
+        """No-op (needed to allow the controller's lifetime to be managed by a with statement)."""
+        return self
+
+    def __exit__(self, exception_type, exception_value, traceback):
+        """Destroy the controller at the end of the with statement that's used to manage its lifetime."""
+        self.terminate()
+
     # PUBLIC ABSTRACT METHODS
 
     @abstractmethod
